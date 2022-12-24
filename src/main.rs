@@ -1,19 +1,21 @@
-use x11rb::connection::Connection;
-use x11rb::errors::ReplyOrIdError;
-use x11rb::protocol::xproto::*;
-use x11rb::COPY_DEPTH_FROM_PARENT;
-use x11rb::rust_connection::RustConnection;
+mod wm;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (conn, screen_num) = x11rb::connect(None).unwrap();
-    let screen = &conn.setup().roots[screen_num];
-    conn.change_window_attributes(screen.root,
-        &ChangeWindowAttributesAux::default().event_mask(
-            EventMask::STRUCTURE_NOTIFY |
-            EventMask::SUBSTRUCTURE_NOTIFY |
-            EventMask::SUBSTRUCTURE_REDIRECT |
-            EventMask::PROPERTY_CHANGE))?;
+use crate::wm::WM;
 
-    conn.flush()?;
-    Ok(())
+use x11rb::errors::ReplyError;
+use x11rb::protocol::ErrorKind;
+
+fn main() {
+    let (conn, screen_num) = x11rb::connect(None)
+        .expect("Failed to connect to the X11 server");
+    let wm = WM::create_wm(conn, screen_num);
+    if let Err(ReplyError::X11Error(error)) = wm {
+        if error.error_kind == ErrorKind::Access {
+            panic!("There is already a window manager present");
+        } else {
+            panic!("An error occurred while trying to become wm");
+        }
+    }
+
+    loop {  }
 }

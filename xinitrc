@@ -1,4 +1,3 @@
 xclock &
-xeyes
-
-exec ./target/debug/mswm
+xeyes &
+./target/debug/mswm
