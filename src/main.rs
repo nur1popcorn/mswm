@@ -17,6 +17,6 @@ fn main() {
         }
     }
 
-    let wm = wm.unwrap();
+    let mut wm = wm.unwrap();
     loop { wm.handle_events().unwrap(); }
 }
