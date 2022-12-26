@@ -1,3 +1,3 @@
 xclock &
 xeyes &
-./target/debug/mswm
+exec ./target/debug/mswm
