@@ -7,12 +7,14 @@ use x11rb::protocol::xproto::*;
 
 const MOD_KEY: Keycode = 0x85;
 const MOVE_BUTTON: Button = 0x1;
+const RESIZE_BUTTON: Button = 0x3;
 
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
     mod_key_down: bool,
-    window: Option<Window>
+    move_flag: bool,
+    window: Option<Window>,
 }
 
 impl WM {
@@ -25,7 +27,12 @@ impl WM {
                         EventMask::SUBSTRUCTURE_NOTIFY);
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
-        Ok(Self { conn, screen_num, mod_key_down: false, window: None })
+        Ok(Self {
+            conn, screen_num,
+            mod_key_down: false,
+            move_flag: false,
+            window: None
+        })
     }
 
     pub fn scan(&self) -> Result<(), ReplyOrIdError> {
@@ -79,21 +86,32 @@ impl WM {
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) {
-        if self.mod_key_down && event.detail == MOVE_BUTTON {
+        self.move_flag = event.detail == MOVE_BUTTON;
+        if self.mod_key_down && (self.move_flag || event.detail == RESIZE_BUTTON) {
             self.window = Some(event.event);
         }
     }
 
     fn handle_button_release(&mut self, event: ButtonReleaseEvent) {
-        if event.detail == MOVE_BUTTON { self.window = None; }
+        if ( self.move_flag && event.detail == MOVE_BUTTON) ||
+           (!self.move_flag && event.detail == RESIZE_BUTTON) {
+            self.window = None;
+        }
     }
 
     fn handle_motion_notify(&self, event: MotionNotifyEvent) -> Result<(), ReplyError> {
         if let Some(window) = self.window {
             let (x, y) = (event.root_x, event.root_y);
-            let (x, y) = (x as i32, y as i32);
-            self.conn.configure_window(window,
-                &ConfigureWindowAux::new().x(x).y(y))?;
+            let config = if self.move_flag {
+                let (x, y) = (x as i32, y as i32);
+                ConfigureWindowAux::new().x(x).y(y)
+            } else {
+                let (x, y) = (x as u32, y as u32);
+                ConfigureWindowAux::new()
+                    .width(x).height(y)
+            };
+
+            self.conn.configure_window(window, &config)?;
             self.conn.flush()?;
         }
         Ok(())
