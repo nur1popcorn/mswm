@@ -28,7 +28,18 @@ impl WM {
         Ok(Self { conn, screen_num, mod_key_down: false, window: None })
     }
 
-    fn manage_window(&self, win: Window) -> Result<(), ReplyOrIdError> {
+    pub fn scan(&self) -> Result<(), ReplyOrIdError> {
+        let screen = &self.conn.setup().roots[self.screen_num];
+        for win in self.conn.query_tree(screen.root)?.reply()?.children {
+            let attr = self.conn.get_window_attributes(win)?.reply()?;
+            if attr.map_state != MapState::UNMAPPED {
+                self.manage(win)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn manage(&self, win: Window) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
@@ -97,7 +108,7 @@ impl WM {
                 Event::ButtonPress(event) => self.handle_button_press(event),
                 Event::ButtonRelease(event) => self.handle_button_release(event),
                 Event::MotionNotify(event) => self.handle_motion_notify(event)?,
-                Event::MapRequest(event) => self.manage_window(event.window)?,
+                Event::MapRequest(event) => self.manage(event.window)?,
                 _ => { }
             }
             // check if more events are already available.
