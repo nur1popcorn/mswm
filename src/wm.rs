@@ -72,6 +72,7 @@ impl WM {
         self.conn.reparent_window(win, frame_win, 0, 0)?;
         self.conn.map_window(win)?;
         self.conn.map_window(frame_win)?;
+        self.grab_buttons(frame_win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
         Ok(())
@@ -114,6 +115,18 @@ impl WM {
             self.conn.configure_window(window, &config)?;
             self.conn.flush()?;
         }
+        Ok(())
+    }
+
+    pub fn grab_buttons(&self, win: Window) -> Result<(), ReplyError> {
+        self.conn.grab_button(
+            false, win,
+            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
+            GrabMode::ASYNC, GrabMode::ASYNC,
+            x11rb::NONE, x11rb::NONE,
+            ButtonIndex::ANY,
+            ModMask::M4
+        )?;
         Ok(())
     }
 
