@@ -80,6 +80,7 @@ impl WM {
     fn handle_configure_request(&self, event: ConfigureRequestEvent) -> Result<(), ReplyError> {
         self.conn.configure_window(event.window,
             &ConfigureWindowAux::from_configure_request(&event))?;
+        self.conn.flush()?;
         Ok(())
     }
 
