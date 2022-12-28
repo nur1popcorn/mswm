@@ -23,8 +23,8 @@ impl WM {
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::KEY_PRESS |
                         EventMask::KEY_RELEASE |
-                        EventMask::SUBSTRUCTURE_REDIRECT |
-                        EventMask::SUBSTRUCTURE_NOTIFY);
+                        EventMask::SUBSTRUCTURE_NOTIFY |
+                        EventMask::SUBSTRUCTURE_REDIRECT);
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
         Ok(Self {
@@ -51,9 +51,8 @@ impl WM {
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
         let win_aux = CreateWindowAux::new()
-            .event_mask(EventMask::BUTTON_PRESS |
-                        EventMask::BUTTON_RELEASE |
-                        EventMask::POINTER_MOTION)
+            .event_mask(EventMask::SUBSTRUCTURE_NOTIFY |
+                        EventMask::SUBSTRUCTURE_REDIRECT)
             .background_pixel(screen.white_pixel);
 
         self.conn.create_window(
@@ -75,6 +74,12 @@ impl WM {
         self.grab_buttons(frame_win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
+        Ok(())
+    }
+
+    fn handle_configure_request(&self, event: ConfigureRequestEvent) -> Result<(), ReplyError> {
+        self.conn.configure_window(event.window,
+            &ConfigureWindowAux::from_configure_request(&event))?;
         Ok(())
     }
 
@@ -134,6 +139,7 @@ impl WM {
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = event_opt {
             match event {
+                Event::ConfigureRequest(event) => self.handle_configure_request(event)?,
                 Event::KeyPress(event) => self.handle_key_press(event),
                 Event::KeyRelease(event) => self.handle_key_release(event),
                 Event::ButtonPress(event) => self.handle_button_press(event),
