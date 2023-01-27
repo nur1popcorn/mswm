@@ -1,4 +1,5 @@
 mod wm;
+mod config;
 
 use crate::wm::WM;
 

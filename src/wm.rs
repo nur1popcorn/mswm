@@ -5,16 +5,14 @@ use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 use x11rb::protocol::xproto::*;
 
-const MOD_KEY: Keycode = 0x85;
-const MOVE_BUTTON: Button = 0x1;
-const RESIZE_BUTTON: Button = 0x3;
+use crate::config::*;
 
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
     mod_key_down: bool,
     move_flag: bool,
-    window: Option<Window>,
+    window: Option<Window>
 }
 
 impl WM {
