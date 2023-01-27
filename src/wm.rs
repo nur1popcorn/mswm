@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use x11rb::errors::{ReplyError, ReplyOrIdError};
 use x11rb::connection::Connection;
 use x11rb::COPY_DEPTH_FROM_PARENT;
@@ -12,14 +13,18 @@ pub struct WM {
     screen_num: usize,
     mod_key_down: bool,
     move_flag: bool,
-    window: Option<Window>
+    window: Option<Window>,
+    window_map: HashMap<Window, Window>
 }
 
 impl WM {
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyError> {
         let screen = &conn.setup().roots[screen_num];
         let change = ChangeWindowAttributesAux::default()
-            .event_mask(EventMask::KEY_PRESS |
+            .event_mask(EventMask::POINTER_MOTION |
+                        EventMask::BUTTON_PRESS |
+                        EventMask::BUTTON_RELEASE |
+                        EventMask::KEY_PRESS |
                         EventMask::KEY_RELEASE |
                         EventMask::SUBSTRUCTURE_NOTIFY |
                         EventMask::SUBSTRUCTURE_REDIRECT);
@@ -29,13 +34,15 @@ impl WM {
             conn, screen_num,
             mod_key_down: false,
             move_flag: false,
-            window: None
+            window: None,
+            window_map: HashMap::new()
         })
     }
 
-    pub fn scan(&self) -> Result<(), ReplyOrIdError> {
+    pub fn scan(&mut self) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
-        for win in self.conn.query_tree(screen.root)?.reply()?.children {
+        let children = self.conn.query_tree(screen.root)?.reply()?.children;
+        for win in children {
             let attr = self.conn.get_window_attributes(win)?.reply()?;
             if attr.map_state != MapState::UNMAPPED {
                 self.manage(win)?;
@@ -44,10 +51,12 @@ impl WM {
         Ok(())
     }
 
-    fn manage(&self, win: Window) -> Result<(), ReplyOrIdError> {
+    fn manage(&mut self, win: Window) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
+        self.window_map.insert(frame_win, win);
+
         let win_aux = CreateWindowAux::new()
             .event_mask(EventMask::SUBSTRUCTURE_NOTIFY |
                         EventMask::SUBSTRUCTURE_REDIRECT)
@@ -117,6 +126,9 @@ impl WM {
             };
 
             self.conn.configure_window(window, &config)?;
+            if let Some(window) = self.window_map.get(&window) {
+                self.conn.configure_window(*window, &config)?;
+            }
             self.conn.flush()?;
         }
         Ok(())
