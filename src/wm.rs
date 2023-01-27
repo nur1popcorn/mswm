@@ -126,8 +126,10 @@ impl WM {
             };
 
             self.conn.configure_window(window, &config)?;
-            if let Some(window) = self.window_map.get(&window) {
-                self.conn.configure_window(*window, &config)?;
+            if !self.move_flag {
+                if let Some(window) = self.window_map.get(&window) {
+                    self.conn.configure_window(*window, &config)?;
+                }
             }
             self.conn.flush()?;
         }
