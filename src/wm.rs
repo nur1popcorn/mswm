@@ -116,21 +116,19 @@ impl WM {
     fn handle_motion_notify(&self, event: MotionNotifyEvent) -> Result<(), ReplyError> {
         if let Some(window) = self.window {
             let (x, y) = (event.root_x, event.root_y);
-            let config = if self.move_flag {
+            if self.move_flag {
                 let (x, y) = (x as i32, y as i32);
-                ConfigureWindowAux::new().x(x).y(y)
+                self.conn.configure_window(window, &
+                    ConfigureWindowAux::new().x(x).y(y))?;
             } else {
                 let (x, y) = (x as u32, y as u32);
-                ConfigureWindowAux::new()
-                    .width(x).height(y)
-            };
-
-            self.conn.configure_window(window, &config)?;
-            if !self.move_flag {
+                let config = ConfigureWindowAux::new()
+                    .width(x).height(y);
+                self.conn.configure_window(window, &config)?;
                 if let Some(window) = self.window_map.get(&window) {
                     self.conn.configure_window(*window, &config)?;
                 }
-            }
+            };
             self.conn.flush()?;
         }
         Ok(())
