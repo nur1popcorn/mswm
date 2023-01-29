@@ -9,7 +9,6 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 
-const TOP_BAR_HEIGHT: u16 = 20;
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
@@ -17,10 +16,11 @@ pub struct WM {
     // Window, event_x, event_y, window_width, window_height
     window: Option<(Window, i16, i16, i32, i32, i32, i32)>,
     window_map: HashMap<Window, Window>,
+    gc: Gcontext
 }
 
 impl WM {
-    pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyError> {
+    pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
@@ -30,9 +30,19 @@ impl WM {
                         EventMask::SUBSTRUCTURE_REDIRECT);
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
+        // create the graphics context
+        let gc = conn.generate_id()?;
+        let font = conn.generate_id()?;
+        conn.open_font(font, b"9x15")?;
+        conn.create_gc(gc, screen.root, &CreateGCAux::new()
+            .graphics_exposures(0)
+            .background(screen.black_pixel)
+            .font(font))?;
+        conn.close_font(font)?;
         Ok(Self {
             conn,
             screen_num,
+            gc,
             move_flag: false,
             window: None,
             window_map: HashMap::new(),
@@ -164,54 +174,23 @@ impl WM {
         Ok(())
     }
 
-    pub fn draw_top_bar(&self, win: Window, width: u16) -> Result<(), ReplyError> {
-        let close_x = cmp::max(0, width - TOP_BAR_HEIGHT);
-        let close_x= close_x as i16;
-        let gc = self.window_map.get(&win).unwrap();
-        self.conn.poly_line(
-            CoordMode::ORIGIN,
-            win,
-            *gc,
-            &[
-                Point { x: close_x, y: 0 },
-                Point {
-                    x: width as _,
-                    y: TOP_BAR_HEIGHT as _,
-                },
-            ],
-        )?;
-        self.conn.poly_line(
-            CoordMode::ORIGIN,
-            win,
-            *gc,
-            &[
-                Point {
-                    x: close_x,
-                    y: TOP_BAR_HEIGHT as _,
-                },
-                Point {
-                    x: width as _,
-                    y: 0,
-                },
-            ],
-        )?;
-        let reply = self
-            .conn
-            .get_property(
-                false,
-                win,
-                AtomEnum::WM_NAME,
-                AtomEnum::STRING,
-                0,
-                std::u32::MAX,
-            )?
-            .reply()?;
-        self.conn
-            .image_text8(win, *gc, 1, 10, &reply.value)?;
+    pub fn draw_top_bar(&self) -> Result<(), ReplyError> {
+        let root = self.conn.setup().roots[self.screen_num].root;
+        let geom = self.conn.get_geometry(root)?.reply().unwrap();
+        self.conn.change_gc(self.gc, &ChangeGCAux::new().foreground(TOP_BAR_COLOR))?;
+        self.conn.poly_fill_rectangle(root, self.gc, &[
+            Rectangle { x: 0, y: 0, width: geom.width, height: TOP_BAR_HEIGHT },
+        ])?;
+        self.conn.change_gc(self.gc, &ChangeGCAux::new()
+            .foreground(TEXT_COLOR)
+            .background(TOP_BAR_COLOR))?;
+        self.conn.image_text8(root, self.gc, 4, TOP_BAR_HEIGHT as i16 - 4, "ABCDEF".as_bytes())?;
+        self.conn.flush()?;
         Ok(())
     }
 
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
+        self.draw_top_bar()?;
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = event_opt {
             match event {
@@ -225,9 +204,6 @@ impl WM {
             // check if more events are already available.
             event_opt = self.conn.poll_for_event()?
         }
-        let win = self.conn.setup().roots[self.screen_num].root;
-        let geom = self.conn.get_geometry(win)?.reply().unwrap();
-        // self.draw_top_bar(win, geom.width)?; //TODO instead of root use a drawable window
         Ok(())
     }
 }
