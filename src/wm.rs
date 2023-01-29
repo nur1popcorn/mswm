@@ -13,7 +13,8 @@ pub struct WM {
     conn: RustConnection,
     screen_num: usize,
     move_flag: bool,
-    window: Option<(Window, i16, i16, i32, i32)>, // Window, event_x, event_y, window_width, window_height
+    // Window, event_x, event_y, window_width, window_height
+    window: Option<(Window, i16, i16, i32, i32, i32, i32)>,
     window_map: HashMap<Window, Window>,
 }
 
@@ -98,14 +99,18 @@ impl WM {
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
         if (state & mask) != 0 && (self.move_flag || event.detail == RESIZE_BUTTON) {
-            let geom = self.conn.get_geometry(event.event)?.reply().unwrap();
-            self.window = Some((
-                event.event,
-                event.event_x,
-                event.event_y,
-                geom.width as i32,
-                geom.height as i32,
-            ));
+            if let Some(window) = self.window_map.get(&event.event) {
+                let geom = self.conn.get_geometry(*window)?.reply().unwrap();
+                self.window = Some((
+                    event.event,
+                    event.event_x,
+                    event.event_y,
+                    geom.x as i32,
+                    geom.y as i32,
+                    geom.width as i32,
+                    geom.height as i32,
+                ));
+            }
         }
         Ok(())
     }
@@ -118,17 +123,16 @@ impl WM {
     }
 
     fn handle_motion_notify(&self, event: MotionNotifyEvent) -> Result<(), ReplyError> {
-        if let Some((window, x_offset, y_offset, width, height)) = self.window {
+        if let Some((window, x_offset, y_offset, w_x, w_y, width, height)) = self.window {
             let (x, y) = (event.root_x - x_offset, event.root_y - y_offset);
             let (x, y) = (x as i32, y as i32);
             if self.move_flag {
                 // TODO: nicify if statements
                 if let Some(parent) = self.window_map.get(&window) {
-                    self.conn
-                        .configure_window(*parent, &ConfigureWindowAux::new().x(x).y(y))?;
+                    self.conn.configure_window(*parent, &ConfigureWindowAux::new().x(x).y(y))?;
                 }
             } else {
-                let (width, height) = (cmp::max(width + x, 0), cmp::max(height + y, 0));
+                let (width, height) = (cmp::max(width + x - w_x, 0), cmp::max(height + y - w_y, 0));
                 let (width, height) = (width as u32, height as u32);
                 let config = ConfigureWindowAux::new().width(width).height(height);
                 // TODO: nicify if statements
