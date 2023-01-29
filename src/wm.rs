@@ -9,6 +9,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 
+const TOP_BAR_HEIGHT: u16 = 20;
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
@@ -75,6 +76,7 @@ impl WM {
             &win_aux,
         )?;
 
+        
         self.conn.grab_server()?;
         self.conn.reparent_window(win, frame_win, 0, 0)?;
         self.conn.map_window(win)?;
@@ -82,6 +84,7 @@ impl WM {
         self.grab_buttons(win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
+
         Ok(())
     }
 
@@ -161,6 +164,53 @@ impl WM {
         Ok(())
     }
 
+    pub fn draw_top_bar(&self, win: Window, width: u16) -> Result<(), ReplyError> {
+        let close_x = cmp::max(0, width - TOP_BAR_HEIGHT);
+        let close_x= close_x as i16;
+        let gc = self.window_map.get(&win).unwrap();
+        self.conn.poly_line(
+            CoordMode::ORIGIN,
+            win,
+            *gc,
+            &[
+                Point { x: close_x, y: 0 },
+                Point {
+                    x: width as _,
+                    y: TOP_BAR_HEIGHT as _,
+                },
+            ],
+        )?;
+        self.conn.poly_line(
+            CoordMode::ORIGIN,
+            win,
+            *gc,
+            &[
+                Point {
+                    x: close_x,
+                    y: TOP_BAR_HEIGHT as _,
+                },
+                Point {
+                    x: width as _,
+                    y: 0,
+                },
+            ],
+        )?;
+        let reply = self
+            .conn
+            .get_property(
+                false,
+                win,
+                AtomEnum::WM_NAME,
+                AtomEnum::STRING,
+                0,
+                std::u32::MAX,
+            )?
+            .reply()?;
+        self.conn
+            .image_text8(win, *gc, 1, 10, &reply.value)?;
+        Ok(())
+    }
+
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = event_opt {
@@ -175,6 +225,9 @@ impl WM {
             // check if more events are already available.
             event_opt = self.conn.poll_for_event()?
         }
+        let win = self.conn.setup().roots[self.screen_num].root;
+        let geom = self.conn.get_geometry(win)?.reply().unwrap();
+        // self.draw_top_bar(win, geom.width)?; //TODO instead of root use a drawable window
         Ok(())
     }
 }
