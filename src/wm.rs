@@ -11,7 +11,6 @@ use crate::config::*;
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
-    mod_key_down: bool,
     move_flag: bool,
     window: Option<Window>,
     window_map: HashMap<Window, Window>
@@ -24,15 +23,12 @@ impl WM {
             .event_mask(EventMask::POINTER_MOTION |
                         EventMask::BUTTON_PRESS |
                         EventMask::BUTTON_RELEASE |
-                        EventMask::KEY_PRESS |
-                        EventMask::KEY_RELEASE |
                         EventMask::SUBSTRUCTURE_NOTIFY |
                         EventMask::SUBSTRUCTURE_REDIRECT);
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
         Ok(Self {
             conn, screen_num,
-            mod_key_down: false,
             move_flag: false,
             window: None,
             window_map: HashMap::new()
@@ -44,7 +40,7 @@ impl WM {
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         for win in children {
             let attr = self.conn.get_window_attributes(win)?.reply()?;
-            if attr.map_state != MapState::UNMAPPED {
+            if attr.map_state != MapState::UNMAPPED && !attr.override_redirect {
                 self.manage(win)?;
             }
         }
@@ -55,7 +51,7 @@ impl WM {
         let screen = &self.conn.setup().roots[self.screen_num];
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
-        self.window_map.insert(frame_win, win);
+        self.window_map.insert(win, frame_win);
 
         let win_aux = CreateWindowAux::new()
             .event_mask(EventMask::SUBSTRUCTURE_NOTIFY |
@@ -78,7 +74,7 @@ impl WM {
         self.conn.reparent_window(win, frame_win, 0, 0)?;
         self.conn.map_window(win)?;
         self.conn.map_window(frame_win)?;
-        self.grab_buttons(frame_win)?;
+        self.grab_buttons(win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
         Ok(())
@@ -91,17 +87,11 @@ impl WM {
         Ok(())
     }
 
-    fn handle_key_press(&mut self, event: KeyPressEvent) {
-        if event.detail == MOD_KEY { self.mod_key_down = true; }
-    }
-
-    fn handle_key_release(&mut self, event: KeyPressEvent) {
-        if event.detail == MOD_KEY { self.mod_key_down = false; }
-    }
-
     fn handle_button_press(&mut self, event: ButtonPressEvent) {
         self.move_flag = event.detail == MOVE_BUTTON;
-        if self.mod_key_down && (self.move_flag || event.detail == RESIZE_BUTTON) {
+        let state: u16 = event.state.into();
+        let mask: u16 = MOD_MASK.into();
+        if (state & mask) != 0 && (self.move_flag || event.detail == RESIZE_BUTTON) {
             self.window = Some(event.event);
         }
     }
@@ -118,16 +108,20 @@ impl WM {
             let (x, y) = (event.root_x, event.root_y);
             if self.move_flag {
                 let (x, y) = (x as i32, y as i32);
-                self.conn.configure_window(window, &
-                    ConfigureWindowAux::new().x(x).y(y))?;
+                // TODO: nicify if statements
+                if let Some(parent) = self.window_map.get(&window) {
+                    self.conn.configure_window(*parent,
+                        &ConfigureWindowAux::new().x(x).y(y))?;
+                }
             } else {
                 let (x, y) = (x as u32, y as u32);
                 let config = ConfigureWindowAux::new()
                     .width(x).height(y);
-                self.conn.configure_window(window, &config)?;
-                if let Some(window) = self.window_map.get(&window) {
-                    self.conn.configure_window(*window, &config)?;
+                // TODO: nicify if statements
+                if let Some(parent) = self.window_map.get(&window) {
+                    self.conn.configure_window(*parent, &config)?;
                 }
+                self.conn.configure_window(window, &config)?;
             };
             self.conn.flush()?;
         }
@@ -141,7 +135,7 @@ impl WM {
             GrabMode::ASYNC, GrabMode::ASYNC,
             x11rb::NONE, x11rb::NONE,
             ButtonIndex::ANY,
-            ModMask::M4
+            MOD_MASK
         )?;
         Ok(())
     }
@@ -151,8 +145,6 @@ impl WM {
         while let Some(event) = event_opt {
             match event {
                 Event::ConfigureRequest(event) => self.handle_configure_request(event)?,
-                Event::KeyPress(event) => self.handle_key_press(event),
-                Event::KeyRelease(event) => self.handle_key_release(event),
                 Event::ButtonPress(event) => self.handle_button_press(event),
                 Event::ButtonRelease(event) => self.handle_button_release(event),
                 Event::MotionNotify(event) => self.handle_motion_notify(event)?,
