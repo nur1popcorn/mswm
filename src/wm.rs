@@ -145,7 +145,7 @@ impl WM {
                     self.conn.configure_window(*parent, &ConfigureWindowAux::new().x(x).y(y))?;
                 }
             } else {
-                let (width, height) = (cmp::max(width + x - w_x, 0), cmp::max(height + y - w_y, 0));
+                let (width, height) = (cmp::max(width + x - w_x, MIN_WIN_WIDTH), cmp::max(height + y - w_y, MIN_WIN_WIDTH));
                 let (width, height) = (width as u32, height as u32);
                 let config = ConfigureWindowAux::new().width(width).height(height);
                 // TODO: nicify if statements
