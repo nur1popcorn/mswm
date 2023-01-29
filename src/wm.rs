@@ -1,10 +1,11 @@
+use std::cmp;
 use std::collections::HashMap;
-use x11rb::errors::{ReplyError, ReplyOrIdError};
 use x11rb::connection::Connection;
-use x11rb::COPY_DEPTH_FROM_PARENT;
+use x11rb::errors::{ReplyError, ReplyOrIdError};
+use x11rb::protocol::xproto::*;
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
-use x11rb::protocol::xproto::*;
+use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 
@@ -12,8 +13,8 @@ pub struct WM {
     conn: RustConnection,
     screen_num: usize,
     move_flag: bool,
-    window: Option<Window>,
-    window_map: HashMap<Window, Window>
+    window: Option<(Window, i16, i16, i32, i32)>, // Window, event_x, event_y, window_width, window_height
+    window_map: HashMap<Window, Window>,
 }
 
 impl WM {
@@ -28,10 +29,11 @@ impl WM {
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
         Ok(Self {
-            conn, screen_num,
+            conn,
+            screen_num,
             move_flag: false,
             window: None,
-            window_map: HashMap::new()
+            window_map: HashMap::new(),
         })
     }
 
@@ -62,8 +64,10 @@ impl WM {
             COPY_DEPTH_FROM_PARENT,
             frame_win,
             screen.root,
-            geom.x, geom.y,
-            geom.width, geom.height,
+            geom.x,
+            geom.y,
+            geom.width,
+            geom.height,
             1,
             WindowClass::INPUT_OUTPUT,
             0,
@@ -81,19 +85,29 @@ impl WM {
     }
 
     fn handle_configure_request(&self, event: ConfigureRequestEvent) -> Result<(), ReplyError> {
-        self.conn.configure_window(event.window,
-            &ConfigureWindowAux::from_configure_request(&event))?;
+        self.conn.configure_window(
+            event.window,
+            &ConfigureWindowAux::from_configure_request(&event),
+        )?;
         self.conn.flush()?;
         Ok(())
     }
 
-    fn handle_button_press(&mut self, event: ButtonPressEvent) {
+    fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
         if (state & mask) != 0 && (self.move_flag || event.detail == RESIZE_BUTTON) {
-            self.window = Some(event.event);
+            let geom = self.conn.get_geometry(event.event)?.reply().unwrap();
+            self.window = Some((
+                event.event,
+                event.event_x,
+                event.event_y,
+                geom.width as i32,
+                geom.height as i32,
+            ));
         }
+        Ok(())
     }
 
     fn handle_button_release(&mut self, event: ButtonReleaseEvent) {
@@ -104,19 +118,19 @@ impl WM {
     }
 
     fn handle_motion_notify(&self, event: MotionNotifyEvent) -> Result<(), ReplyError> {
-        if let Some(window) = self.window {
-            let (x, y) = (event.root_x, event.root_y);
+        if let Some((window, x_offset, y_offset, width, height)) = self.window {
+            let (x, y) = (event.root_x - x_offset, event.root_y - y_offset);
+            let (x, y) = (x as i32, y as i32);
             if self.move_flag {
-                let (x, y) = (x as i32, y as i32);
                 // TODO: nicify if statements
                 if let Some(parent) = self.window_map.get(&window) {
-                    self.conn.configure_window(*parent,
-                        &ConfigureWindowAux::new().x(x).y(y))?;
+                    self.conn
+                        .configure_window(*parent, &ConfigureWindowAux::new().x(x).y(y))?;
                 }
             } else {
-                let (x, y) = (x as u32, y as u32);
-                let config = ConfigureWindowAux::new()
-                    .width(x).height(y);
+                let (width, height) = (cmp::max(width + x, 0), cmp::max(height + y, 0));
+                let (width, height) = (width as u32, height as u32);
+                let config = ConfigureWindowAux::new().width(width).height(height);
                 // TODO: nicify if statements
                 if let Some(parent) = self.window_map.get(&window) {
                     self.conn.configure_window(*parent, &config)?;
@@ -130,12 +144,15 @@ impl WM {
 
     pub fn grab_buttons(&self, win: Window) -> Result<(), ReplyError> {
         self.conn.grab_button(
-            false, win,
+            false,
+            win,
             EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
-            GrabMode::ASYNC, GrabMode::ASYNC,
-            x11rb::NONE, x11rb::NONE,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC,
+            x11rb::NONE,
+            x11rb::NONE,
             ButtonIndex::ANY,
-            MOD_MASK
+            MOD_MASK,
         )?;
         Ok(())
     }
@@ -145,11 +162,11 @@ impl WM {
         while let Some(event) = event_opt {
             match event {
                 Event::ConfigureRequest(event) => self.handle_configure_request(event)?,
-                Event::ButtonPress(event) => self.handle_button_press(event),
+                Event::ButtonPress(event) => self.handle_button_press(event)?,
                 Event::ButtonRelease(event) => self.handle_button_release(event),
                 Event::MotionNotify(event) => self.handle_motion_notify(event)?,
                 Event::MapRequest(event) => self.manage(event.window)?,
-                _ => { }
+                _ => {}
             }
             // check if more events are already available.
             event_opt = self.conn.poll_for_event()?
