@@ -1,5 +1,6 @@
 use std::cmp;
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use x11rb::connection::Connection;
 use x11rb::errors::{ReplyError, ReplyOrIdError};
 use x11rb::protocol::xproto::*;
@@ -12,11 +13,13 @@ use crate::config::*;
 pub struct WM {
     conn: RustConnection,
     screen_num: usize,
+
     move_flag: bool,
-    // Window, event_x, event_y, window_width, window_height
     window: Option<(Window, i16, i16, i32, i32, i32, i32)>,
+
+    gc: Gcontext,
+    sequence_ignore: BinaryHeap<Reverse<u16>>,
     window_map: HashMap<Window, Window>,
-    gc: Gcontext
 }
 
 impl WM {
@@ -30,6 +33,7 @@ impl WM {
                         EventMask::SUBSTRUCTURE_REDIRECT);
         // only one X client can select substructure redirection.
         conn.change_window_attributes(screen.root, &change)?.check()?;
+
         // create the graphics context
         let gc = conn.generate_id()?;
         let font = conn.generate_id()?;
@@ -39,12 +43,14 @@ impl WM {
             .background(screen.black_pixel)
             .font(font))?;
         conn.close_font(font)?;
+
         Ok(Self {
             conn,
             screen_num,
-            gc,
             move_flag: false,
             window: None,
+            gc,
+            sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
         })
     }
@@ -71,7 +77,6 @@ impl WM {
             .event_mask(EventMask::SUBSTRUCTURE_NOTIFY |
                         EventMask::SUBSTRUCTURE_REDIRECT)
             .background_pixel(screen.white_pixel);
-
         self.conn.create_window(
             COPY_DEPTH_FROM_PARENT,
             frame_win,
@@ -86,15 +91,27 @@ impl WM {
             &win_aux,
         )?;
 
-        
         self.conn.grab_server()?;
-        self.conn.reparent_window(win, frame_win, 0, 0)?;
+        let cookie = self.conn.reparent_window(win, frame_win, 0, 0)?;
+        self.sequence_ignore.push(
+            Reverse(cookie.sequence_number() as u16));
         self.conn.map_window(win)?;
         self.conn.map_window(frame_win)?;
         self.grab_buttons(win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
+        Ok(())
+    }
 
+    fn unmanage(&mut self, win: Window) -> Result<(), ReplyError> {
+        println!("{win}");
+        if let Some(parent) = self.window_map.remove(&win) {
+            let screen = &self.conn.setup().roots[self.screen_num];
+            self.conn.reparent_window(win, screen.root, 0, 0)?;
+            self.conn.unmap_window(parent)?;
+            self.conn.destroy_window(parent)?;
+            self.conn.flush()?;
+        }
         Ok(())
     }
 
@@ -189,17 +206,32 @@ impl WM {
         Ok(())
     }
 
+    pub fn should_execute(&mut self, event: &Event) -> bool {
+        if let Some(seq) = event.wire_sequence_number() {
+            while let Some(&Reverse(ignore)) = self.sequence_ignore.peek() {
+                if ignore.wrapping_sub(seq) <= u16::MAX / 2 {
+                    return ignore != seq
+                }
+                self.sequence_ignore.pop();
+            }
+        }
+        true
+    }
+
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
         self.draw_top_bar()?;
         let mut event_opt = Some(self.conn.wait_for_event()?);
-        while let Some(event) = event_opt {
-            match event {
-                Event::ConfigureRequest(event) => self.handle_configure_request(event)?,
-                Event::ButtonPress(event) => self.handle_button_press(event)?,
-                Event::ButtonRelease(event) => self.handle_button_release(event),
-                Event::MotionNotify(event) => self.handle_motion_notify(event)?,
-                Event::MapRequest(event) => self.manage(event.window)?,
-                _ => {}
+        while let Some(event) = &event_opt {
+            if self.should_execute(&event) {
+                match event {
+                    Event::ConfigureRequest(event) => self.handle_configure_request(*event)?,
+                    Event::ButtonPress(event) => self.handle_button_press(*event)?,
+                    Event::ButtonRelease(event) => self.handle_button_release(*event),
+                    Event::MotionNotify(event) => self.handle_motion_notify(*event)?,
+                    Event::MapRequest(event) => self.manage(event.window)?,
+                    Event::UnmapNotify(event) => self.unmanage(event.window)?,
+                    _ => {}
+                }
             }
             // check if more events are already available.
             event_opt = self.conn.poll_for_event()?
