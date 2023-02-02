@@ -104,7 +104,6 @@ impl WM {
     }
 
     fn unmanage(&mut self, win: Window) -> Result<(), ReplyError> {
-        println!("{win}");
         if let Some(parent) = self.window_map.remove(&win) {
             let screen = &self.conn.setup().roots[self.screen_num];
             self.conn.reparent_window(win, screen.root, 0, 0)?;
