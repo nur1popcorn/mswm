@@ -191,7 +191,7 @@ impl WM {
         Ok(())
     }
 
-    pub fn draw_top_bar(&self) -> Result<(), ReplyError> {
+    pub fn draw_top_bar(&self, text: String) -> Result<(), ReplyError> {
         let root = self.conn.setup().roots[self.screen_num].root;
         let geom = self.conn.get_geometry(root)?.reply().unwrap();
         self.conn.change_gc(self.gc, &ChangeGCAux::new().foreground(TOP_BAR_COLOR))?;
@@ -201,7 +201,7 @@ impl WM {
         self.conn.change_gc(self.gc, &ChangeGCAux::new()
             .foreground(TEXT_COLOR)
             .background(TOP_BAR_COLOR))?;
-        self.conn.image_text8(root, self.gc, 4, TOP_BAR_HEIGHT as i16 - 4, "ABCDEF".as_bytes())?;
+        self.conn.image_text8(root, self.gc, 4, TOP_BAR_HEIGHT as i16 - 4, text.as_bytes())?;
         self.conn.flush()?;
         Ok(())
     }
@@ -219,7 +219,24 @@ impl WM {
     }
 
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
-        self.draw_top_bar()?;
+        if let Some(win) = self.window {
+            let p = self
+                .conn
+                .get_property(
+                    false,
+                    win.0,
+                    AtomEnum::WM_NAME,
+                    AtomEnum::STRING,
+                    0,
+                    std::u32::MAX,
+                )?
+                .reply()?;
+            self.draw_top_bar(String::from_utf8(p.value).unwrap())?;
+        }
+        else {
+            self.draw_top_bar("MSWM".to_string())?;
+        }
+
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = &event_opt {
             if self.should_execute(&event) {
