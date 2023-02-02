@@ -7,6 +7,7 @@ use x11rb::protocol::xproto::*;
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 use x11rb::COPY_DEPTH_FROM_PARENT;
+//use x11rb::protocol::Event::MotionNotify;
 
 use crate::config::*;
 
@@ -16,6 +17,7 @@ pub struct WM {
 
     move_flag: bool,
     window: Option<(Window, i16, i16, i32, i32, i32, i32)>,
+    focused: Option<Window>,
 
     gc: Gcontext,
     sequence_ignore: BinaryHeap<Reverse<u16>>,
@@ -49,6 +51,7 @@ impl WM {
             screen_num,
             move_flag: false,
             window: None,
+            focused: None,
             gc,
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
@@ -125,6 +128,7 @@ impl WM {
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
+        self.focused = Some(event.event.clone()); //TODO find out how to actually find the active window
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
@@ -191,7 +195,7 @@ impl WM {
         Ok(())
     }
 
-    pub fn draw_top_bar(&self, text: String) -> Result<(), ReplyError> {
+    pub fn draw_top_bar(&self) -> Result<(), ReplyError> {
         let root = self.conn.setup().roots[self.screen_num].root;
         let geom = self.conn.get_geometry(root)?.reply().unwrap();
         self.conn.change_gc(self.gc, &ChangeGCAux::new().foreground(TOP_BAR_COLOR))?;
@@ -201,7 +205,37 @@ impl WM {
         self.conn.change_gc(self.gc, &ChangeGCAux::new()
             .foreground(TEXT_COLOR)
             .background(TOP_BAR_COLOR))?;
-        self.conn.image_text8(root, self.gc, 4, TOP_BAR_HEIGHT as i16 - 4, text.as_bytes())?;
+
+        if let Some(win) = self.focused {
+            let p = self
+                .conn
+                .get_property(
+                    false,
+                    win,
+                    AtomEnum::WM_NAME,
+                    AtomEnum::STRING,
+                    0,
+                    std::u32::MAX,
+                )?
+                .reply()?;
+            self.conn.image_text8(
+                root,
+                self.gc,
+                4,
+                TOP_BAR_HEIGHT as i16 - 4,
+                String::from_utf8(p.value).unwrap().as_bytes()
+            )?;
+        }
+        else {
+            self.conn.image_text8(
+                root,
+                self.gc,
+                4,
+                TOP_BAR_HEIGHT as i16 - 4,
+                "MSWM".as_bytes()
+            )?;
+        }
+
         self.conn.flush()?;
         Ok(())
     }
@@ -219,24 +253,7 @@ impl WM {
     }
 
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
-        if let Some(win) = self.window {
-            let p = self
-                .conn
-                .get_property(
-                    false,
-                    win.0,
-                    AtomEnum::WM_NAME,
-                    AtomEnum::STRING,
-                    0,
-                    std::u32::MAX,
-                )?
-                .reply()?;
-            self.draw_top_bar(String::from_utf8(p.value).unwrap())?;
-        }
-        else {
-            self.draw_top_bar("MSWM".to_string())?;
-        }
-
+        self.draw_top_bar()?;
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = &event_opt {
             if self.should_execute(&event) {
