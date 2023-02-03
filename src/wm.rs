@@ -7,7 +7,6 @@ use x11rb::protocol::xproto::*;
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 use x11rb::COPY_DEPTH_FROM_PARENT;
-//use x11rb::protocol::Event::MotionNotify;
 
 use crate::config::*;
 
@@ -29,6 +28,8 @@ impl WM {
         let screen = &conn.setup().roots[screen_num];
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
+                        EventMask::ENTER_WINDOW |
+                        EventMask::LEAVE_WINDOW |
                         EventMask::BUTTON_PRESS |
                         EventMask::BUTTON_RELEASE |
                         EventMask::SUBSTRUCTURE_NOTIFY |
@@ -127,8 +128,6 @@ impl WM {
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
-        self.focused = Some(event.event.clone()); //TODO find out how to actually find the active window
-        println!("{:?}", self.conn.get_input_focus().unwrap().reply().unwrap());
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
@@ -180,6 +179,14 @@ impl WM {
         Ok(())
     }
 
+    fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
+        self.focused = Some(event.root);
+    }
+
+    fn handle_leave_notify(&mut self, _event: LeaveNotifyEvent) {
+        self.focused = None;
+    }
+
     pub fn grab_buttons(&self, win: Window) -> Result<(), ReplyError> {
         self.conn.grab_button(
             false,
@@ -215,7 +222,7 @@ impl WM {
                     AtomEnum::WM_NAME,
                     AtomEnum::STRING,
                     0,
-                    std::u32::MAX,
+                    u32::MAX,
                 )?
                 .reply()?;
             self.conn.image_text8(
@@ -262,6 +269,8 @@ impl WM {
                     Event::ButtonPress(event) => self.handle_button_press(*event)?,
                     Event::ButtonRelease(event) => self.handle_button_release(*event),
                     Event::MotionNotify(event) => self.handle_motion_notify(*event)?,
+                    Event::EnterNotify(event) => self.handle_enter_notify(*event),
+                    Event::LeaveNotify(event) => self.handle_leave_notify(*event),
                     Event::MapRequest(event) => self.manage(event.window)?,
                     Event::UnmapNotify(event) => self.unmanage(event.window)?,
                     _ => {}
