@@ -129,6 +129,7 @@ impl WM {
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
         self.focused = Some(event.event.clone()); //TODO find out how to actually find the active window
+        println!("{:?}", self.conn.get_input_focus().unwrap().reply().unwrap());
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
