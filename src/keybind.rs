@@ -26,32 +26,33 @@ impl KeyBind {
             for j in 0 .. keyboard_mapping.keysyms_per_keycode {
                 let keysym = keyboard_mapping.keysyms[j as usize + i * keyboard_mapping.keysyms_per_keycode as usize];
                 if keysym > 0 {
+                    keymap.insert(xkb::keysym_get_name(keysym), j as u16);
                     //print!("{:?}, ", xkb::keysym_get_name(keysym));
                 }
             }
             //println!();
         }
-        println!("{:?}", KeyBind::new("control+c"));
+        println!("{:?}", KeyBind::new("CTRL+C", &keymap));
         Ok(keymap)
     }
 
-    pub fn new(s: &str) -> KeyBind {
+    pub fn new(s: &str, keymap: &HashMap<String, u16>) -> KeyBind {
         let mut binding = KeyBind { mask: 0, key: 0 };
         for key in s.split("+") {
-            match key {
-                "shift" => { binding.mask |= ModMask::SHIFT; },
-                "lock" => { binding.mask |= ModMask::LOCK; },
-                "control" => { binding.mask |= ModMask::CONTROL; },
-                "m1" => { binding.mask |= ModMask::M1; },
-                "m2" => { binding.mask |= ModMask::M2; },
-                "m3" => { binding.mask |= ModMask::M3; },
-                "m4" => { binding.mask |= ModMask::M4; },
-                "m5" => { binding.mask |= ModMask::M5; },
-                "any" => { binding.mask |= ModMask::ANY; },
-                _ => {}
+            match &key[..] {
+                "SHIFT" => { binding.mask |= ModMask::SHIFT; },
+                "LOCK" => { binding.mask |= ModMask::LOCK; },
+                "CTRL" => { binding.mask |= ModMask::CONTROL; },
+                "M1" => { binding.mask |= ModMask::M1; },
+                "M2" => { binding.mask |= ModMask::M2; },
+                "M3" => { binding.mask |= ModMask::M3; },
+                "M4" => { binding.mask |= ModMask::M4; },
+                "M5" => { binding.mask |= ModMask::M5; },
+                "ANY" => { binding.mask |= ModMask::ANY; },
+                _ => { binding.key = keymap[key]; }
             }
-            println!("{:?}", binding);
+            //println!("{:?}", binding);
         }
-        panic!()
+        binding
     }
 }
