@@ -33,8 +33,6 @@ impl WM {
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
-                        EventMask::ENTER_WINDOW |
-                        EventMask::LEAVE_WINDOW |
                         EventMask::BUTTON_PRESS |
                         EventMask::BUTTON_RELEASE |
                         EventMask::SUBSTRUCTURE_NOTIFY |
@@ -83,7 +81,9 @@ impl WM {
         self.window_map.insert(win, frame_win);
 
         let win_aux = CreateWindowAux::new()
-            .event_mask(EventMask::SUBSTRUCTURE_NOTIFY |
+            .event_mask(EventMask::ENTER_WINDOW |
+                        EventMask::LEAVE_WINDOW |
+                        EventMask::SUBSTRUCTURE_NOTIFY |
                         EventMask::SUBSTRUCTURE_REDIRECT)
             .background_pixel(screen.white_pixel);
         self.conn.create_window(
@@ -185,7 +185,8 @@ impl WM {
     }
 
     fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
-        self.focused = Some(event.root);
+        println!("{:?}", event);
+        self.focused = Some(event.event);
     }
 
     fn handle_leave_notify(&mut self, _event: LeaveNotifyEvent) {
