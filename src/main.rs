@@ -1,6 +1,7 @@
 mod wm;
 mod config;
 mod layout;
+mod keybind;
 
 use crate::wm::WM;
 

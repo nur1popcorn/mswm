@@ -23,31 +23,12 @@ pub struct WM {
     window_map: HashMap<Window, Window>,
 }
 
-pub struct KeyBind {
-    mask: u16,
-    key: u16
-}
-
 impl WM {
-
-    pub fn get_key_bind(&mut self) -> Result<KeyBind, ReplyError> {
-        let min_keycode: Keycode = self.conn.setup().min_keycode;
-        let max_keycode: Keycode = self.conn.setup().max_keycode;
-        let keyboard_mapping = self.conn.get_keyboard_mapping(min_keycode.clone(), (max_keycode - min_keycode + 1) as u8)?.reply()?;
-        let n_keycode =
-
-        //let keymap = HashMap::new();
-        /*
-        for (i = min_keycode; i <= max_keycode; i++) {
-            ...
-                map.put(i, XKeysymToString(...))
-        }
-        */
-        panic!();
-    }
-
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
+
+        crate::keybind::get_keymap(&conn);
+
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
                         EventMask::ENTER_WINDOW |
