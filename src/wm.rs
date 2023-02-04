@@ -154,6 +154,7 @@ impl WM {
                 .x(rect.x as i32)
                 .y(rect.y as i32))?;
         }
+        self.draw_top_bar()?;
         self.conn.flush()?;
         Ok(())
     }
@@ -213,7 +214,10 @@ impl WM {
     }
 
     fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
-        //self.focused = Some(event.child);
+        if event.child != 0 {
+            // println!("{}", event.child);
+            self.focused = Some(event.child);
+        }
     }
 
     fn handle_leave_notify(&mut self, _event: LeaveNotifyEvent) {
@@ -257,13 +261,12 @@ impl WM {
                     0,
                     u32::MAX,
                 )?
-                .reply()
-                .unwrap();
+                .reply()?;
             let p = p.value;
             self.conn.image_text8(
                 root,
                 self.gc,
-                4,
+                500, //TODO change pos back to 4 when window overlay is fixed
                 TOP_BAR_HEIGHT as i16 - 4,
                 String::from_utf8(p).unwrap().as_bytes()
             )?;
@@ -274,7 +277,7 @@ impl WM {
                 self.gc,
                 4,
                 TOP_BAR_HEIGHT as i16 - 4,
-                "MSWM".as_bytes()
+                "MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM".as_bytes() //TODO remove long text when when window overlay is fixed
             )?;
         }
 
@@ -295,7 +298,6 @@ impl WM {
     }
 
     pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
-        self.draw_top_bar()?;
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = &event_opt {
             if self.should_execute(&event) {
@@ -314,6 +316,7 @@ impl WM {
             // check if more events are already available.
             event_opt = self.conn.poll_for_event()?
         }
+        self.draw_top_bar()?;
         Ok(())
     }
 }
