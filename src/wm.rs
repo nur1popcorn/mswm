@@ -142,7 +142,8 @@ impl WM {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
-        for (win, rect) in layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children) {
+        let layout = layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children);
+        for (win, rect) in layout {
             let config = &ConfigureWindowAux::new()
                 .width(rect.width as u32)
                 .height(rect.height as u32);
@@ -158,7 +159,7 @@ impl WM {
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
-        self.do_layout(FibonacciLayout { });
+        self.do_layout(FibonacciLayout { })?;
 
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
