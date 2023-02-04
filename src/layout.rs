@@ -1,15 +1,16 @@
 use x11rb::protocol::xproto::{Rectangle, Window};
+use crate::config::TOP_BAR_HEIGHT;
 
-trait Layout {
-    fn layout(&mut self, screen: Rectangle, windows: Vec<Window>) -> Vec<(Window, Rectangle)>;
+pub trait Layout2 {
+    fn layout(self, screen: Rectangle, windows: Vec<Window>) -> Vec<(Window, Rectangle)>;
 }
 
-struct FibonacciLayout { }
+pub struct FibonacciLayout { }
 
-impl Layout for FibonacciLayout {
-    fn layout(&mut self, screen: Rectangle, windows: Vec<Window>) -> Vec<(Window, Rectangle)> {
+impl Layout2 for FibonacciLayout {
+    fn layout(self, screen: Rectangle, windows: Vec<Window>) -> Vec<(Window, Rectangle)> {
         let mut result = Vec::with_capacity(windows.len());
-        let (mut x, mut y, mut width, mut height) = (0i16, 0i16, screen.width, screen.height);
+        let (mut x, mut y, mut width, mut height) = (0i16, TOP_BAR_HEIGHT as i16, screen.width, screen.height - TOP_BAR_HEIGHT);
         for i in 0 .. windows.len() - 1 {
             if i % 2 == 0 {
                 width /= 2;
@@ -18,8 +19,11 @@ impl Layout for FibonacciLayout {
             }
             result.push((windows[i], Rectangle { x, y, width, height }));
 
-            x += width as i16;
-            y += height as i16;
+            if i % 2 == 0 {
+                x += width as i16;
+            } else {
+                y += height as i16;
+            }
         }
         result.push((windows[windows.len() - 1], Rectangle { x, y, width, height }));
         result

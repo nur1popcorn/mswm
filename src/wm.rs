@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use std::cmp;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
@@ -10,6 +11,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyBind;
+use crate::layout::{FibonacciLayout, Layout2};
 
 pub struct WM {
     conn: RustConnection,
@@ -22,6 +24,7 @@ pub struct WM {
     gc: Gcontext,
     sequence_ignore: BinaryHeap<Reverse<u16>>,
     window_map: HashMap<Window, Window>,
+    window_map_reverse: HashMap<Window, Window>,
 }
 
 impl WM {
@@ -59,6 +62,7 @@ impl WM {
             gc,
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
+            window_map_reverse: HashMap::new(),
         })
     }
 
@@ -79,6 +83,7 @@ impl WM {
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
         self.window_map.insert(win, frame_win);
+        self.window_map_reverse.insert(frame_win, win);
 
         let win_aux = CreateWindowAux::new()
             .event_mask(EventMask::ENTER_WINDOW |
@@ -114,6 +119,7 @@ impl WM {
 
     fn unmanage(&mut self, win: Window) -> Result<(), ReplyError> {
         if let Some(parent) = self.window_map.remove(&win) {
+            self.window_map_reverse.remove(&parent);
             let screen = &self.conn.setup().roots[self.screen_num];
             self.conn.reparent_window(win, screen.root, 0, 0)?;
             self.conn.unmap_window(parent)?;
@@ -132,7 +138,28 @@ impl WM {
         Ok(())
     }
 
+    fn do_layout(&mut self, layout: impl Layout2) -> Result<(), ReplyError> {
+        let screen = &self.conn.setup().roots[self.screen_num];
+        let children = self.conn.query_tree(screen.root)?.reply()?.children;
+        let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
+        for (win, rect) in layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children) {
+            let config = &ConfigureWindowAux::new()
+                .width(rect.width as u32)
+                .height(rect.height as u32);
+            if let Some(parent) = self.window_map_reverse.get(&win) {
+                self.conn.configure_window(*parent, &config)?;
+            }
+            self.conn.configure_window(win, &config
+                .x(rect.x as i32)
+                .y(rect.y as i32))?;
+        }
+        self.conn.flush()?;
+        Ok(())
+    }
+
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
+        self.do_layout(FibonacciLayout { });
+
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
@@ -185,7 +212,7 @@ impl WM {
     }
 
     fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
-        self.focused = Some(event.child);
+        //self.focused = Some(event.child);
     }
 
     fn handle_leave_notify(&mut self, _event: LeaveNotifyEvent) {
