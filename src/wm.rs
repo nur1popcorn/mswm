@@ -9,6 +9,7 @@ use x11rb::rust_connection::RustConnection;
 use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
+use crate::keybind::KeyBind;
 
 pub struct WM {
     conn: RustConnection,
@@ -24,10 +25,11 @@ pub struct WM {
 }
 
 impl WM {
+
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
 
-        crate::keybind::get_keymap(&conn);
+        KeyBind::get_keymap(&conn);
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
