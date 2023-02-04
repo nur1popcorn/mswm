@@ -256,13 +256,15 @@ impl WM {
                     0,
                     u32::MAX,
                 )?
-                .reply()?;
+                .reply()
+                .unwrap();
+            let p = p.value;
             self.conn.image_text8(
                 root,
                 self.gc,
                 4,
                 TOP_BAR_HEIGHT as i16 - 4,
-                String::from_utf8(p.value).unwrap().as_bytes()
+                String::from_utf8(p).unwrap().as_bytes()
             )?;
         }
         else {
