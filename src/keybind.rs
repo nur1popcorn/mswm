@@ -13,26 +13,21 @@ pub struct KeyBind {
 }
 
 impl KeyBind {
-
     pub fn get_keymap(conn: &RustConnection) -> Result<HashMap<String, u16>, ReplyError> {
         let setup = conn.setup();
         let keyboard_mapping = conn.get_keyboard_mapping(
             setup.min_keycode, setup.max_keycode - setup.min_keycode + 1)?.reply()?;
 
         let mut keymap = HashMap::new();
-        let nkeycodes = keyboard_mapping.keysyms.len() / (keyboard_mapping.keysyms_per_keycode as usize);
-        for i in 0 .. nkeycodes {
-            //print!("{:?} = ", setup.min_keycode as usize + i);
+        let keysym_count = keyboard_mapping.keysyms_per_keycode as usize;
+        for i in 0 .. keyboard_mapping.keysyms.len() / keysym_count {
             for j in 0 .. keyboard_mapping.keysyms_per_keycode {
-                let keysym = keyboard_mapping.keysyms[j as usize + i * keyboard_mapping.keysyms_per_keycode as usize];
+                let keysym = keyboard_mapping.keysyms[j as usize + i * keysym_count];
                 if keysym > 0 {
                     keymap.insert(xkb::keysym_get_name(keysym), (setup.min_keycode as u16) + (i as u16));
-                    //print!("{:?}, ", xkb::keysym_get_name(keysym));
                 }
             }
-            //println!();
         }
-        println!("{:?}", KeyBind::new("CTRL+LOCK+C", &keymap));
         Ok(keymap)
     }
 
@@ -40,18 +35,17 @@ impl KeyBind {
         let mut binding = KeyBind { mask: 0, key: 0 };
         for key in s.split("+") {
             match &key[..] {
-                "SHIFT" => { binding.mask |= ModMask::SHIFT; },
-                "LOCK" => { binding.mask |= ModMask::LOCK; },
-                "CTRL" => { binding.mask |= ModMask::CONTROL; },
-                "M1" => { binding.mask |= ModMask::M1; },
-                "M2" => { binding.mask |= ModMask::M2; },
-                "M3" => { binding.mask |= ModMask::M3; },
-                "M4" => { binding.mask |= ModMask::M4; },
-                "M5" => { binding.mask |= ModMask::M5; },
-                "ANY" => { binding.mask |= ModMask::ANY; },
-                _ => { binding.key = keymap[key]; }
+                "SHIFT"   => { binding.mask |= ModMask::SHIFT;   },
+                "LOCK"    => { binding.mask |= ModMask::LOCK;    },
+                "CONTROL" => { binding.mask |= ModMask::CONTROL; },
+                "M1"      => { binding.mask |= ModMask::M1;      },
+                "M2"      => { binding.mask |= ModMask::M2;      },
+                "M3"      => { binding.mask |= ModMask::M3;      },
+                "M4"      => { binding.mask |= ModMask::M4;      },
+                "M5"      => { binding.mask |= ModMask::M5;      },
+                "ANY"     => { binding.mask |= ModMask::ANY;     },
+                _         => { binding.key = keymap[key];        }
             }
-            //println!("{:?}", binding);
         }
         binding
     }

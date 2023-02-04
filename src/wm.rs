@@ -185,8 +185,7 @@ impl WM {
     }
 
     fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
-        println!("{:?}", event);
-        self.focused = Some(event.event);
+        self.focused = Some(event.child);
     }
 
     fn handle_leave_notify(&mut self, _event: LeaveNotifyEvent) {
