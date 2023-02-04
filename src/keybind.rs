@@ -26,13 +26,13 @@ impl KeyBind {
             for j in 0 .. keyboard_mapping.keysyms_per_keycode {
                 let keysym = keyboard_mapping.keysyms[j as usize + i * keyboard_mapping.keysyms_per_keycode as usize];
                 if keysym > 0 {
-                    keymap.insert(xkb::keysym_get_name(keysym), j as u16);
+                    keymap.insert(xkb::keysym_get_name(keysym), (setup.min_keycode as u16) + (i as u16));
                     //print!("{:?}, ", xkb::keysym_get_name(keysym));
                 }
             }
             //println!();
         }
-        println!("{:?}", KeyBind::new("CTRL+C", &keymap));
+        println!("{:?}", KeyBind::new("CTRL+LOCK+C", &keymap));
         Ok(keymap)
     }
 
