@@ -35,8 +35,21 @@ impl WM {
     pub fn get_key_bind(&mut self) -> Result<KeyBind, ReplyError> {
         let min_keycode: Keycode = self.conn.setup().min_keycode;
         let max_keycode: Keycode = self.conn.setup().max_keycode;
-        let keyboard_mapping = self.conn.get_keyboard_mapping(min_keycode.clone(), (max_keycode - min_keycode + 1) as u8)?.reply()?;
-        let n_keycode =
+        let keyboard_mapping = self.conn.get_keyboard_mapping(
+            min_keycode.clone(),
+            (max_keycode - min_keycode + 1) as u8
+        )?.reply()?;
+
+        let zero: u32 = 0; // classic Rust Autism
+        let n_keysyms = keyboard_mapping.keysyms.iter().filter(|x| x > &&zero).count();
+        let n_keycodes = n_keysyms / (keyboard_mapping.keysyms_per_keycode as usize);
+
+        for keycode_idx in 0..n_keycodes {
+            print!("keycode {}", (min_keycode as usize) + &keycode_idx);
+            for keysm_idx in 0..keyboard_mapping.keysyms_per_keycode {
+                println!("{}", "insert keyboard key here");
+            }
+        }
 
         //let keymap = HashMap::new();
         /*
