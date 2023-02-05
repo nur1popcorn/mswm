@@ -28,6 +28,7 @@ impl KeyBind {
                 }
             }
         }
+        println!("{:?}", KeyBind::new("C", &keymap));
         Ok(keymap)
     }
 

@@ -112,6 +112,7 @@ impl WM {
         self.conn.map_window(win)?;
         self.conn.map_window(frame_win)?;
         self.grab_buttons(win)?;
+        self.grab_keys(win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
         Ok(())
@@ -138,7 +139,7 @@ impl WM {
         Ok(())
     }
 
-    fn do_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
+    fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
@@ -160,8 +161,6 @@ impl WM {
     }
 
     fn handle_button_press(&mut self, event: ButtonPressEvent) -> Result<(), ReplyError> {
-        self.do_layout(FibonacciLayout { })?;
-
         self.move_flag = event.detail == MOVE_BUTTON;
         let state: u16 = event.state.into();
         let mask: u16 = MOD_MASK.into();
@@ -187,6 +186,15 @@ impl WM {
            (!self.move_flag && event.detail == RESIZE_BUTTON) {
             self.window = None;
         }
+    }
+
+    fn handle_key_press(&mut self, event: KeyPressEvent) -> Result<(), ReplyError> {
+        let val = event.detail;
+        println!("{:?}", &val);
+        if val == 54 { //TODO replace constant 54 with dynamic mapping
+            self.apply_layout(FibonacciLayout {})?;
+        }
+        Ok(())
     }
 
     fn handle_motion_notify(&self, event: MotionNotifyEvent) -> Result<(), ReplyError> {
@@ -235,6 +243,19 @@ impl WM {
             x11rb::NONE,
             ButtonIndex::ANY,
             MOD_MASK,
+        )?;
+        Ok(())
+    }
+
+    pub fn grab_keys(&self, win: Window) -> Result<(), ReplyError> {
+        // TODO query hotkey combinations from map
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::M4,
+            54, // TODO replace constant 54 with dynamic mapping
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
         )?;
         Ok(())
     }
@@ -307,6 +328,7 @@ impl WM {
                     Event::ButtonRelease(event) => self.handle_button_release(*event),
                     Event::MotionNotify(event) => self.handle_motion_notify(*event)?,
                     Event::EnterNotify(event) => self.handle_enter_notify(*event),
+                    Event::KeyPress(event) => self.handle_key_press(*event)?,
                     Event::LeaveNotify(event) => self.handle_leave_notify(*event),
                     Event::MapRequest(event) => self.manage(event.window)?,
                     Event::UnmapNotify(event) => self.unmanage(event.window)?,
