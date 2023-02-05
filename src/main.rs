@@ -10,7 +10,7 @@ use x11rb::errors::ReplyOrIdError;
 use x11rb::protocol::ErrorKind;
 use crate::config::spawn_program;
 use crate::keybind::{init_keymap, KeyBindHandler, make_action};
-use crate::layout::FibonacciLayout;
+use crate::layout::{FibonacciLayout, TreeLayout, WindowLayout};
 
 fn main() {
     let (conn, screen_num) = x11rb::connect(None)
@@ -18,9 +18,10 @@ fn main() {
     init_keymap(&conn).unwrap();
 
     let key_handler = KeyBindHandler::new(HashMap::from([
-        ("M4+x",            make_action(|wm| wm.apply_layout(FibonacciLayout{}))),
-        ("M4+f",            make_action(|wm| wm.stack_inc())),
-        ("M4+g",            make_action(|wm| wm.stack_dec())),
+        ("M4+f",            make_action(|wm| wm.apply_layout(FibonacciLayout))),
+        ("M4+g",            make_action(|wm| wm.apply_layout(TreeLayout))),
+        ("M4+j",            make_action(|wm| wm.stack_inc())),
+        ("M4+k",            make_action(|wm| wm.stack_dec())),
         ("M4+SHIFT+c",      make_action(|wm| wm.kill_focused())),
         ("M4+SHIFT+Return", make_action(|_|  spawn_program("xterm")))
     ]));

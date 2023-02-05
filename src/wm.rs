@@ -154,9 +154,7 @@ impl WM {
     }
 
     pub fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyOrIdError> {
-        let screen = &self.conn.setup().roots[self.screen_num];
         self.tiling_win_stack.append(&mut self.floating_win_stack);
-        //let children = self.conn.query_tree(screen.root)?.reply()?.children;
         self.create_new_layout(layout)?;
         Ok(())
     }
@@ -238,7 +236,6 @@ impl WM {
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
         let layout = layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children);
         for (win, rect) in layout {
-            println!("{}", win);
             let config = &ConfigureWindowAux::new()
                 .width(rect.width as u32)
                 .height(rect.height as u32);

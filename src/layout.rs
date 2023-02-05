@@ -35,10 +35,8 @@ impl WindowLayout for FibonacciLayout {
 pub struct TreeLayout;
 
 impl WindowLayout for TreeLayout {
-
     fn layout(self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
         let mut result = Vec::with_capacity(windows.len());
-
         if windows.len() > 0 {
             let mut nr_leafs = 0;
             let mut leafs: Vec<(Window, Rectangle, bool)> = Vec::with_capacity(windows.len() * 2);
@@ -100,5 +98,3 @@ impl WindowLayout for TreeLayout {
         result
     }
 }
-
-//TODO implement WindowLayout
