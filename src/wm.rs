@@ -25,7 +25,13 @@ pub struct WM {
     window_map: HashMap<Window, Window>,
     window_map_reverse: HashMap<Window, Window>,
 
-    fib_layout_hotkey: KeyBind
+    fib_layout_hotkey: KeyBind,
+    win_layout_hotkey: KeyBind,
+    win_close_hotkey: KeyBind,
+    win_move_up_hotkey: KeyBind,
+    win_move_down_hotkey: KeyBind,
+    win_move_left_hotkey: KeyBind,
+    win_move_right_hotkey: KeyBind,
 }
 
 impl WM {
@@ -33,9 +39,15 @@ impl WM {
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
 
-        let key_map = KeyBind::get_keymap(&conn);
-        // TODO make config for custom shortcuts
-        let fib_layout_hotkey = KeyBind::new("M4+C",&key_map?);
+        let key_map = KeyBind::get_keymap(&conn).unwrap();
+        // TODO make config for custom shortcuts //TODO some way to set M2 vs M4
+        let fib_layout_hotkey = KeyBind::new("M2+f",&key_map);
+        let win_layout_hotkey = KeyBind::new("M2+f",&key_map);
+        let win_close_hotkey = KeyBind::new("M2+c",&key_map);
+        let win_move_up_hotkey = KeyBind::new("M2+u",&key_map);
+        let win_move_down_hotkey = KeyBind::new("M2+d",&key_map);
+        let win_move_left_hotkey = KeyBind::new("M2+l",&key_map);
+        let win_move_right_hotkey = KeyBind::new("M2+r",&key_map);
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
@@ -66,7 +78,13 @@ impl WM {
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
             window_map_reverse: HashMap::new(),
-            fib_layout_hotkey
+            fib_layout_hotkey,
+            win_layout_hotkey,
+            win_close_hotkey,
+            win_move_up_hotkey,
+            win_move_down_hotkey,
+            win_move_left_hotkey,
+            win_move_right_hotkey,
         })
     }
 
@@ -194,9 +212,24 @@ impl WM {
 
     fn handle_key_press(&mut self, event: KeyPressEvent) -> Result<(), ReplyError> {
         let key: u16 = event.detail as u16;
-        if key == self.fib_layout_hotkey.key {
-            self.apply_layout(FibonacciLayout {})?;
-        }
+        let fib_layout_hotkey = self.fib_layout_hotkey.key;
+        let win_layout_hotkey = self.win_layout_hotkey.key;
+        let win_close_hotkey = self.win_close_hotkey.key;
+        let win_move_up_hotkey = self.win_move_up_hotkey.key;
+        let win_move_down_hotkey = self.win_move_down_hotkey.key;
+        let win_move_left_hotkey = self.win_move_left_hotkey.key;
+        let win_move_right_hotkey = self.win_move_right_hotkey.key;
+        println!("handle key press was called");
+        match key {
+            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout {})?,
+            win if win == win_layout_hotkey => todo!(),
+            close if close == win_close_hotkey => self.apply_layout(FibonacciLayout {})?,
+            up if up == win_move_up_hotkey => self.apply_layout(FibonacciLayout {})?,
+            down if down == win_move_down_hotkey => self.apply_layout(FibonacciLayout {})?,
+            left if left == win_move_left_hotkey => self.apply_layout(FibonacciLayout {})?,
+            right if right == win_move_right_hotkey => self.apply_layout(FibonacciLayout {})?,
+            _ => println!("NO MATCH KEY") //{},
+        };
         Ok(())
     }
 
@@ -239,7 +272,7 @@ impl WM {
         self.conn.grab_button(
             false,
             win,
-            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
+            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION | EventMask::KEY_PRESS,
             GrabMode::ASYNC,
             GrabMode::ASYNC,
             x11rb::NONE,
@@ -257,6 +290,54 @@ impl WM {
             win,
             ModMask::from(self.fib_layout_hotkey.mask),
             self.fib_layout_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_layout_hotkey.mask),
+            self.win_layout_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_close_hotkey.mask),
+            self.win_close_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_move_up_hotkey.mask),
+            self.win_move_up_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_move_down_hotkey.mask),
+            self.win_move_down_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_move_left_hotkey.mask),
+            self.win_move_left_hotkey.key as u8,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC
+        )?;
+        self.conn.grab_key(
+            false,
+            win,
+            ModMask::from(self.win_move_right_hotkey.mask),
+            self.win_move_right_hotkey.key as u8,
             GrabMode::ASYNC,
             GrabMode::ASYNC
         )?;
