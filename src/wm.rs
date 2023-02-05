@@ -11,7 +11,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyBind;
-use crate::layout::{FibonacciLayout, Layout2};
+use crate::layout::{FibonacciLayout, WindowLayout};
 
 pub struct WM {
     conn: RustConnection,
@@ -138,7 +138,7 @@ impl WM {
         Ok(())
     }
 
-    fn do_layout(&mut self, layout: impl Layout2) -> Result<(), ReplyError> {
+    fn do_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
