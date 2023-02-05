@@ -1,4 +1,3 @@
-use std::alloc::Layout;
 use std::cmp;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
@@ -25,6 +24,8 @@ pub struct WM {
     sequence_ignore: BinaryHeap<Reverse<u16>>,
     window_map: HashMap<Window, Window>,
     window_map_reverse: HashMap<Window, Window>,
+
+    fib_layout_hotkey: KeyBind
 }
 
 impl WM {
@@ -32,7 +33,9 @@ impl WM {
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
 
-        KeyBind::get_keymap(&conn);
+        let key_map = KeyBind::get_keymap(&conn);
+        // TODO make config for custom shortcuts
+        let fib_layout_hotkey = KeyBind::new("M4+C",&key_map?);
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
@@ -63,6 +66,7 @@ impl WM {
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
             window_map_reverse: HashMap::new(),
+            fib_layout_hotkey
         })
     }
 
@@ -189,9 +193,8 @@ impl WM {
     }
 
     fn handle_key_press(&mut self, event: KeyPressEvent) -> Result<(), ReplyError> {
-        let val = event.detail;
-        println!("{:?}", &val);
-        if val == 54 { //TODO replace constant 54 with dynamic mapping
+        let key: u16 = event.detail as u16;
+        if key == self.fib_layout_hotkey.key {
             self.apply_layout(FibonacciLayout {})?;
         }
         Ok(())
@@ -248,12 +251,12 @@ impl WM {
     }
 
     pub fn grab_keys(&self, win: Window) -> Result<(), ReplyError> {
-        // TODO query hotkey combinations from map
+        // TODO loop for all shortcuts
         self.conn.grab_key(
             false,
             win,
-            ModMask::M4,
-            54, // TODO replace constant 54 with dynamic mapping
+            ModMask::from(self.fib_layout_hotkey.mask),
+            self.fib_layout_hotkey.key as u8,
             GrabMode::ASYNC,
             GrabMode::ASYNC
         )?;

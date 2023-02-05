@@ -4,12 +4,11 @@ use x11rb::errors::ReplyError;
 use x11rb::protocol::xproto::{ConnectionExt, ModMask};
 use x11rb::rust_connection::RustConnection;
 use xkbcommon::xkb;
-use crate::config::MOD_MASK;
 
 #[derive(Debug)]
 pub struct KeyBind {
-    mask: u16,
-    key: u16
+    pub mask: u16,
+    pub key: u16
 }
 
 impl KeyBind {
@@ -28,7 +27,6 @@ impl KeyBind {
                 }
             }
         }
-        println!("{:?}", KeyBind::new("C", &keymap));
         Ok(keymap)
     }
 
