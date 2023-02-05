@@ -188,6 +188,7 @@ impl WM {
                     let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
                     if index > 0 {
                         self.tiling_win_stack.swap(index, index-1);
+                        self.focused = Some(self.tiling_win_stack[index]);
                         self.create_new_layout(FibonacciLayout)?;
                     }
                 }
