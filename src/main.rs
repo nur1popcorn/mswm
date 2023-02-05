@@ -25,7 +25,8 @@ fn main() {
     }
 
     let key_handler = KeyBindHandler::new(HashMap::from([
-        ("M4+e", |wm: &mut WM| { wm.apply_layout(FibonacciLayout{}) }),
+        ("M4+x", |wm: &mut WM| { wm.apply_layout(FibonacciLayout{}) })
+        //("M4+i", |wm: &mut WM| { wm.stack_inc() }),
     ]));
 
     let mut wm = wm.unwrap();

@@ -10,7 +10,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyHandler;
-use crate::layout::WindowLayout;
+use crate::layout::{FibonacciLayout, WindowLayout};
 
 pub struct WM {
     conn: RustConnection,
@@ -181,14 +181,14 @@ impl WM {
         }
     }
 
-    fn win_move_up(&mut self) -> Result<(), ReplyError> {
+    pub fn stack_inc(&mut self) -> Result<(), ReplyOrIdError> {
         if let Some(win) = self.focused {
             if let Some(win) = self.window_map.get(&win){
                 if self.tiling_win_stack.contains(&win){
                     let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
                     if index > 0 {
                         self.tiling_win_stack.swap(index, index-1);
-                        self.create_new_layout(FibonacciLayout {})?;
+                        self.create_new_layout(FibonacciLayout)?;
                     }
                 }
             }
