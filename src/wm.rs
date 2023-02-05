@@ -266,7 +266,7 @@ impl WM {
             self.conn.image_text8(
                 root,
                 self.gc,
-                500, //TODO change pos back to 4 when window overlay is fixed
+                TOP_BAR_TEXT_OFFSET,
                 TOP_BAR_HEIGHT as i16 - 4,
                 String::from_utf8(p).unwrap().as_bytes()
             )?;
@@ -275,9 +275,9 @@ impl WM {
             self.conn.image_text8(
                 root,
                 self.gc,
-                4,
+                TOP_BAR_TEXT_OFFSET,
                 TOP_BAR_HEIGHT as i16 - 4,
-                "MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM MSWM".as_bytes() //TODO remove long text when when window overlay is fixed
+                "MSWM".as_bytes()
             )?;
         }
 
