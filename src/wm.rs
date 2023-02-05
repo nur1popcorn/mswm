@@ -96,7 +96,7 @@ impl WM {
             frame_win,
             screen.root,
             geom.x,
-            geom.y,
+            geom.y + (TOP_BAR_HEIGHT as i16),
             geom.width,
             geom.height,
             1,
