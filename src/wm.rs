@@ -203,8 +203,11 @@ impl WM {
                 if self.tiling_win_stack.contains(&win){
                     let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
                     if index < self.tiling_win_stack.len() - 1 {
+                        // TODO its just swapping the same two elements help
+                        println!("{:?}", &self.tiling_win_stack);
                         self.tiling_win_stack.swap(index, index+1);
-                        self.focused = Some(self.tiling_win_stack[index]);
+                        self.focused = self.window_map_reverse.get(&self.tiling_win_stack[index]).copied();
+                        println!("{:?}", &self.tiling_win_stack);
                         self.create_new_layout(FibonacciLayout)?;
                     }
                 }
@@ -219,7 +222,6 @@ impl WM {
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
         let layout = layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children);
         for (win, rect) in layout {
-            println!("{}", win);
             let config = &ConfigureWindowAux::new()
                 .width(rect.width as u32)
                 .height(rect.height as u32);
