@@ -30,9 +30,9 @@ pub struct WM {
 }
 
 impl WM {
-    pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
+    pub fn create_wm(conn: RustConnection, screen_num: usize, key_handler: &impl KeyHandler) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
-
+        key_handler.grab_keys(&conn, screen.root)?;
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
                         EventMask::BUTTON_PRESS |
@@ -122,10 +122,18 @@ impl WM {
 
     fn unmanage(&mut self, win: Window) -> Result<(), ReplyError> {
         if let Some(parent) = self.window_map.remove(&win) {
-            let index = self.floating_win_stack.iter().position(|w| *w == win).unwrap();
-            self.floating_win_stack.remove(index);
-            let index = self.tiling_win_stack.iter().position(|w| *w == win).unwrap();
-            self.tiling_win_stack.remove(index);
+            if let Some(index) = self.floating_win_stack.iter().position(|w| *w == parent) {
+                self.floating_win_stack.remove(index);
+            }
+            if let Some(index) = self.tiling_win_stack.iter().position(|w| *w == parent) {
+                self.tiling_win_stack.remove(index);
+            }
+            if let Some(focused) = self.focused {
+                if focused == win {
+                    self.focused = None;
+                }
+            }
+
             self.window_map_reverse.remove(&parent);
             let screen = &self.conn.setup().roots[self.screen_num];
             self.conn.reparent_window(win, screen.root, 0, 0)?;
@@ -169,6 +177,9 @@ impl WM {
                     geom.width as i32,
                     geom.height as i32,
                 ));
+                self.conn.configure_window(*window, &ConfigureWindowAux::new()
+                    .stack_mode(StackMode::ABOVE))?;
+                self.conn.flush()?;
             }
         }
         Ok(())
@@ -209,6 +220,14 @@ impl WM {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    pub fn kill_focused(&mut self) -> Result<(), ReplyOrIdError> {
+        if let Some(focused) = self.focused {
+            self.unmanage(focused)?;
+            self.conn.kill_client(focused)?;
         }
         Ok(())
     }
