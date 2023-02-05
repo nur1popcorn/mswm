@@ -10,7 +10,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyHandler;
-use crate::layout::{FibonacciLayout, WindowLayout};
+use crate::layout::{FibonacciLayout, TreeLayout, WindowLayout};
 
 pub struct WM {
     conn: RustConnection,
@@ -27,6 +27,8 @@ pub struct WM {
 
     tiling_win_stack: Vec<Window>,
     floating_win_stack: Vec<Window>,
+
+    pub layout_flag: bool
 }
 
 impl WM {
@@ -64,6 +66,7 @@ impl WM {
             window_map_reverse: HashMap::new(),
             tiling_win_stack: Vec::new(),
             floating_win_stack: Vec::new(),
+            layout_flag: false
         })
     }
 
@@ -153,9 +156,17 @@ impl WM {
         Ok(())
     }
 
-    pub fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyOrIdError> {
+    fn get_layout(&self) -> Box<dyn WindowLayout> {
+        if self.layout_flag {
+            Box::new(FibonacciLayout)
+        } else {
+            Box::new(TreeLayout)
+        }
+    }
+
+    pub fn apply_layout(&mut self) -> Result<(), ReplyOrIdError> {
         self.tiling_win_stack.append(&mut self.floating_win_stack);
-        self.create_new_layout(layout)?;
+        self.create_new_layout(&self.get_layout())?;
         Ok(())
     }
 
@@ -198,7 +209,7 @@ impl WM {
                     if index > 0 {
                         self.tiling_win_stack.swap(index, index-1);
                         self.focused = Some(self.tiling_win_stack[index]);
-                        self.create_new_layout(FibonacciLayout)?;
+                        self.create_new_layout(&self.get_layout())?;
                     }
                 }
             }
@@ -212,12 +223,9 @@ impl WM {
                 if self.tiling_win_stack.contains(&win){
                     let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
                     if index < self.tiling_win_stack.len() - 1 {
-                        // TODO its just swapping the same two elements help
-                        println!("{:?}", &self.tiling_win_stack);
                         self.tiling_win_stack.swap(index, index+1);
                         self.focused = self.window_map_reverse.get(&self.tiling_win_stack[index]).copied();
-                        println!("{:?}", &self.tiling_win_stack);
-                        self.create_new_layout(FibonacciLayout)?;
+                        self.create_new_layout(&self.get_layout())?;
                     }
                 }
             }
@@ -233,7 +241,7 @@ impl WM {
         Ok(())
     }
 
-    fn create_new_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
+    fn create_new_layout(&mut self, layout: &Box<dyn WindowLayout>) -> Result<(), ReplyError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = &self.tiling_win_stack;
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();

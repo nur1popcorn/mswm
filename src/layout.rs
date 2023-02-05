@@ -2,13 +2,13 @@ use x11rb::protocol::xproto::{Rectangle, Window};
 use crate::config::TOP_BAR_HEIGHT;
 
 pub trait WindowLayout {
-    fn layout(self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)>;
+    fn layout(&self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)>;
 }
 
 pub struct FibonacciLayout;
 
 impl WindowLayout for FibonacciLayout {
-    fn layout(self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
+    fn layout(&self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
         let mut result = Vec::with_capacity(windows.len());
         if windows.len() > 0 {
             let (mut x, mut y, mut width, mut height) = (0i16, TOP_BAR_HEIGHT as i16, screen.width, screen.height - TOP_BAR_HEIGHT);
@@ -35,7 +35,7 @@ impl WindowLayout for FibonacciLayout {
 pub struct TreeLayout;
 
 impl WindowLayout for TreeLayout {
-    fn layout(self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
+    fn layout(&self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
         let mut result = Vec::with_capacity(windows.len());
         if windows.len() > 0 {
             let mut nr_leafs = 0;
