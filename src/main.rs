@@ -20,8 +20,8 @@ fn main() {
     let mut layout: Box<dyn WindowLayout> = Box::new(FibonacciLayout);
 
     let key_handler = KeyBindHandler::new(HashMap::from([
-        ("M4+f",            make_action(|wm| { wm.layout_flag = false; wm.apply_layout() })),
-        ("M4+g",            make_action(|wm| { wm.layout_flag = true;  wm.apply_layout() })),
+        ("M4+f",            make_action(|wm| { wm.layout_flag = true; wm.apply_layout() })),
+        ("M4+g",            make_action(|wm| { wm.layout_flag = false;  wm.apply_layout() })),
         ("M4+j",            make_action(|wm| wm.stack_inc())),
         ("M4+k",            make_action(|wm| wm.stack_dec())),
         ("M4+SHIFT+c",      make_action(|wm| wm.kill_focused())),

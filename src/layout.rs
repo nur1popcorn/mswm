@@ -91,7 +91,7 @@ impl WindowLayout for TreeLayout {
             }
 
             for i in nr_leafs..leafs.len() {
-                result.push((leafs[i].0, leafs[i].1));
+                result.push((leafs[(i-nr_leafs)*2].0, leafs[i].1));
             }
         }
 
