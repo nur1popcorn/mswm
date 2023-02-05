@@ -4,6 +4,8 @@ The aim is to remain minimalistic in design with a clean implementation of essen
 
 ~ Keanu Pöschko, Peter Pfeiffer
 
+![Image](./funny.png)
+
 ## Installation
 
 ### Requirements
