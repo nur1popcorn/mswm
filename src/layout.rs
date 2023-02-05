@@ -36,7 +36,7 @@ pub struct TreeLayout;
 
 impl WindowLayout for TreeLayout {
 
-    fn layout(self, screen: Rectangle, windows: Vec<Window>) -> Vec<(Window, Rectangle)> {
+    fn layout(self, screen: Rectangle, windows: &Vec<Window>) -> Vec<(Window, Rectangle)> {
         let mut result = Vec::with_capacity(windows.len());
 
         if windows.len() > 0 {
