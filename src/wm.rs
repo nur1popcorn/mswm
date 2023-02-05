@@ -10,7 +10,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyBind;
-use crate::layout::{FibonacciLayout, WindowLayout};
+use crate::layout::{TreeLayout, FibonacciLayout, WindowLayout};
 
 pub struct WM {
     conn: RustConnection,
@@ -221,13 +221,13 @@ impl WM {
         let win_move_right_hotkey = self.win_move_right_hotkey.key;
         println!("handle key press was called");
         match key {
-            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout {})?,
+            fib if fib == fib_layout_hotkey => self.apply_layout(TreeLayout)?,
             win if win == win_layout_hotkey => todo!(),
-            close if close == win_close_hotkey => self.apply_layout(FibonacciLayout {})?,
-            up if up == win_move_up_hotkey => self.apply_layout(FibonacciLayout {})?,
-            down if down == win_move_down_hotkey => self.apply_layout(FibonacciLayout {})?,
-            left if left == win_move_left_hotkey => self.apply_layout(FibonacciLayout {})?,
-            right if right == win_move_right_hotkey => self.apply_layout(FibonacciLayout {})?,
+            close if close == win_close_hotkey => self.apply_layout(FibonacciLayout)?,
+            up if up == win_move_up_hotkey => self.apply_layout(FibonacciLayout)?,
+            down if down == win_move_down_hotkey => self.apply_layout(FibonacciLayout)?,
+            left if left == win_move_left_hotkey => self.apply_layout(FibonacciLayout)?,
+            right if right == win_move_right_hotkey => self.apply_layout(FibonacciLayout)?,
             _ => println!("NO MATCH KEY") //{},
         };
         Ok(())
