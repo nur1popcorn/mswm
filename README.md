@@ -46,9 +46,17 @@ The mouse and keyboard can be captured/released with `ctrl + shift`.
 While we are proud of what we have created thus far, we would not yet recommend you to switch to MSWM on your main system ...
 
 ### Controls
-Windows can be dragged by moving the cursor while pressing `super-key + left mouse`.
-Resizing works similarly with `super-key + right mouse`.
-`super-key + C` applies a Fibonacci layout to the windows.
+Windows can be dragged by moving the cursor while pressing `M4 + left-mouse`.
+Resizing works similarly with `M4 + right-mouse`.
+The following shortcuts are available:
+- `M4 + f` apply a fibonacci window layout
+- `M4 + g` apply a tree window layout
+- `M4 + j` move window up
+- `M4 + k` move window down
+- `M4 + SHIFT + c` kill focused window
+- `M4 + SHIFT + RETURN` spawn program `xterm`
+
+(`M4` is usually the super-key in linux based systems; for some MAC based systems it is `M2` instead.)
 
 ## License
 For legal reasons, MSWM is currently *not* under any Open Source license.
