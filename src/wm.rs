@@ -9,8 +9,8 @@ use x11rb::rust_connection::RustConnection;
 use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
-use crate::keybind::KeyBind;
-use crate::layout::{FibonacciLayout, WindowLayout};
+use crate::keybind::KeyHandler;
+use crate::layout::WindowLayout;
 
 pub struct WM {
     conn: RustConnection,
@@ -23,31 +23,12 @@ pub struct WM {
     gc: Gcontext,
     sequence_ignore: BinaryHeap<Reverse<u16>>,
     window_map: HashMap<Window, Window>,
-    window_map_reverse: HashMap<Window, Window>,
-
-    fib_layout_hotkey: KeyBind,
-    win_layout_hotkey: KeyBind,
-    win_close_hotkey: KeyBind,
-    win_move_up_hotkey: KeyBind,
-    win_move_down_hotkey: KeyBind,
-    win_move_left_hotkey: KeyBind,
-    win_move_right_hotkey: KeyBind,
+    window_map_reverse: HashMap<Window, Window>
 }
 
 impl WM {
-
     pub fn create_wm(conn: RustConnection, screen_num: usize) -> Result<Self, ReplyOrIdError> {
         let screen = &conn.setup().roots[screen_num];
-
-        let key_map = KeyBind::get_keymap(&conn).unwrap();
-        // TODO make config for custom shortcuts //TODO some way to set M2 vs M4
-        let fib_layout_hotkey = KeyBind::new("M4+f",&key_map);
-        let win_layout_hotkey = KeyBind::new("M4+f",&key_map);
-        let win_close_hotkey = KeyBind::new("M4+c",&key_map);
-        let win_move_up_hotkey = KeyBind::new("M4+u",&key_map);
-        let win_move_down_hotkey = KeyBind::new("M4+d",&key_map);
-        let win_move_left_hotkey = KeyBind::new("M4+l",&key_map);
-        let win_move_right_hotkey = KeyBind::new("M4+r",&key_map);
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
@@ -77,30 +58,23 @@ impl WM {
             gc,
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
-            window_map_reverse: HashMap::new(),
-            fib_layout_hotkey,
-            win_layout_hotkey,
-            win_close_hotkey,
-            win_move_up_hotkey,
-            win_move_down_hotkey,
-            win_move_left_hotkey,
-            win_move_right_hotkey,
+            window_map_reverse: HashMap::new()
         })
     }
 
-    pub fn scan(&mut self) -> Result<(), ReplyOrIdError> {
+    pub fn scan(&mut self, key_handler: &impl KeyHandler) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         for win in children {
             let attr = self.conn.get_window_attributes(win)?.reply()?;
             if attr.map_state != MapState::UNMAPPED && !attr.override_redirect {
-                self.manage(win)?;
+                self.manage(win, key_handler)?;
             }
         }
         Ok(())
     }
 
-    fn manage(&mut self, win: Window) -> Result<(), ReplyOrIdError> {
+    fn manage(&mut self, win: Window, key_handler: &impl KeyHandler) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let geom = self.conn.get_geometry(win)?.reply()?;
         let frame_win = self.conn.generate_id()?;
@@ -134,7 +108,7 @@ impl WM {
         self.conn.map_window(win)?;
         self.conn.map_window(frame_win)?;
         self.grab_buttons(win)?;
-        self.grab_keys(win)?;
+        self.grab_keys(key_handler, win)?;
         self.conn.ungrab_server()?;
         self.conn.flush()?;
         Ok(())
@@ -161,7 +135,7 @@ impl WM {
         Ok(())
     }
 
-    fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
+    pub fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = self.conn.query_tree(screen.root)?.reply()?.children;
         let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
@@ -210,26 +184,8 @@ impl WM {
         }
     }
 
-    fn handle_key_press(&mut self, event: KeyPressEvent) -> Result<(), ReplyError> {
-        let key: u16 = event.detail as u16;
-        let fib_layout_hotkey = self.fib_layout_hotkey.key;
-        let win_layout_hotkey = self.win_layout_hotkey.key;
-        let win_close_hotkey = self.win_close_hotkey.key;
-        let win_move_up_hotkey = self.win_move_up_hotkey.key;
-        let win_move_down_hotkey = self.win_move_down_hotkey.key;
-        let win_move_left_hotkey = self.win_move_left_hotkey.key;
-        let win_move_right_hotkey = self.win_move_right_hotkey.key;
-        println!("handle key press was called");
-        match key {
-            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout {})?,
-            win if win == win_layout_hotkey => todo!(),
-            close if close == win_close_hotkey => self.apply_layout(FibonacciLayout {})?,
-            up if up == win_move_up_hotkey => self.apply_layout(FibonacciLayout {})?,
-            down if down == win_move_down_hotkey => self.apply_layout(FibonacciLayout {})?,
-            left if left == win_move_left_hotkey => self.apply_layout(FibonacciLayout {})?,
-            right if right == win_move_right_hotkey => self.apply_layout(FibonacciLayout {})?,
-            _ => println!("NO MATCH KEY") //{},
-        };
+    fn handle_key_press(&mut self, event: KeyPressEvent, key_handler: &impl KeyHandler) -> Result<(), ReplyOrIdError> {
+        key_handler.handle_key_bind(self, event.state, event.detail)?;
         Ok(())
     }
 
@@ -259,7 +215,6 @@ impl WM {
 
     fn handle_enter_notify(&mut self, event: EnterNotifyEvent) {
         if event.child != 0 {
-            // println!("{}", event.child);
             self.focused = Some(event.child);
         }
     }
@@ -270,8 +225,7 @@ impl WM {
 
     pub fn grab_buttons(&self, win: Window) -> Result<(), ReplyError> {
         self.conn.grab_button(
-            false,
-            win,
+            false, win,
             EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
             GrabMode::ASYNC,
             GrabMode::ASYNC,
@@ -283,64 +237,8 @@ impl WM {
         Ok(())
     }
 
-    pub fn grab_keys(&self, win: Window) -> Result<(), ReplyError> {
-        // TODO loop for all shortcuts
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.fib_layout_hotkey.mask),
-            self.fib_layout_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_layout_hotkey.mask),
-            self.win_layout_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_close_hotkey.mask),
-            self.win_close_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_move_up_hotkey.mask),
-            self.win_move_up_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_move_down_hotkey.mask),
-            self.win_move_down_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_move_left_hotkey.mask),
-            self.win_move_left_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
-        self.conn.grab_key(
-            false,
-            win,
-            ModMask::from(self.win_move_right_hotkey.mask),
-            self.win_move_right_hotkey.key as u8,
-            GrabMode::ASYNC,
-            GrabMode::ASYNC
-        )?;
+    pub fn grab_keys(&self, key_handler: &impl KeyHandler, win: Window) -> Result<(), ReplyError> {
+        key_handler.grab_keys(&self.conn, win)?;
         Ok(())
     }
 
@@ -402,7 +300,7 @@ impl WM {
         true
     }
 
-    pub fn handle_events(&mut self) -> Result<(), ReplyOrIdError> {
+    pub fn handle_events(&mut self, key_handler: &impl KeyHandler) -> Result<(), ReplyOrIdError> {
         let mut event_opt = Some(self.conn.wait_for_event()?);
         while let Some(event) = &event_opt {
             if self.should_execute(&event) {
@@ -412,9 +310,9 @@ impl WM {
                     Event::ButtonRelease(event) => self.handle_button_release(*event),
                     Event::MotionNotify(event) => self.handle_motion_notify(*event)?,
                     Event::EnterNotify(event) => self.handle_enter_notify(*event),
-                    Event::KeyPress(event) => self.handle_key_press(*event)?,
+                    Event::KeyPress(event) => self.handle_key_press(*event, key_handler)?,
                     Event::LeaveNotify(event) => self.handle_leave_notify(*event),
-                    Event::MapRequest(event) => self.manage(event.window)?,
+                    Event::MapRequest(event) => self.manage(event.window, key_handler)?,
                     Event::UnmapNotify(event) => self.unmanage(event.window)?,
                     _ => {}
                 }
