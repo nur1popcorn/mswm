@@ -58,32 +58,34 @@ impl From<&str> for KeyBind {
     }
 }
 
+type KeyBindAction = Box<dyn Fn(&mut WM) -> Result<(), ReplyOrIdError>>;
+
+pub fn make_action<F>(f: F) -> KeyBindAction where
+    F: Fn(&mut WM) -> Result<(), ReplyOrIdError> + 'static
+{
+    Box::new(f) as KeyBindAction
+}
+
 pub trait KeyHandler {
     fn grab_keys(&self, conn: &RustConnection, win: Window) -> Result<(), ReplyError>;
     fn handle_key_bind(&self, wm: &mut WM, mask: KeyButMask, key: Keycode) -> Result<(), ReplyOrIdError>;
 }
 
-pub struct KeyBindHandler<F> where
-    F: Fn(&mut WM) -> Result<(), ReplyOrIdError> + 'static
-{
-    bind_map: HashMap<KeyBind, Box<F>>
+pub struct KeyBindHandler where {
+    bind_map: HashMap<KeyBind, KeyBindAction>
 }
 
-impl <F> KeyBindHandler<F> where
-    F: Fn(&mut WM) -> Result<(), ReplyOrIdError> + 'static
-{
-    pub fn new(map: HashMap<&str, F>) -> Self {
+impl KeyBindHandler where {
+    pub fn new(map: HashMap<&str, KeyBindAction>) -> Self {
         let mut bind_map = HashMap::with_capacity(map.len());
         for (k, v) in map {
-            bind_map.insert(KeyBind::from(k), Box::new(v));
+            bind_map.insert(KeyBind::from(k), v);
         }
         Self { bind_map }
     }
 }
 
-impl <F> KeyHandler for KeyBindHandler<F> where
-    F: Fn(&mut WM) -> Result<(), ReplyOrIdError> + 'static
-{
+impl KeyHandler for KeyBindHandler {
     fn grab_keys(&self, conn: &RustConnection, win: Window) -> Result<(), ReplyError> {
         for (k, _) in &self.bind_map {
             conn.grab_key(

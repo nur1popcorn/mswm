@@ -8,7 +8,7 @@ use crate::wm::WM;
 
 use x11rb::errors::ReplyOrIdError;
 use x11rb::protocol::ErrorKind;
-use crate::keybind::{init_keymap, KeyBindHandler};
+use crate::keybind::{init_keymap, KeyBindHandler, make_action};
 use crate::layout::FibonacciLayout;
 
 fn main() {
@@ -25,8 +25,9 @@ fn main() {
     }
 
     let key_handler = KeyBindHandler::new(HashMap::from([
-        ("M4+x", |wm: &mut WM| { wm.apply_layout(FibonacciLayout{}) })
-        //("M4+i", |wm: &mut WM| { wm.stack_inc() }),
+        ("M4+x", make_action(|wm: &mut WM| { wm.apply_layout(FibonacciLayout{}) })),
+        ("M4+f", make_action(|wm: &mut WM| { wm.stack_inc() })),
+        ("M4+g", make_action(|wm: &mut WM| { wm.stack_dec() })),
     ]));
 
     let mut wm = wm.unwrap();
