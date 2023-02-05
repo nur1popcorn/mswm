@@ -197,6 +197,21 @@ impl WM {
         Ok(())
     }
 
+    pub fn stack_dec(&mut self) -> Result<(), ReplyOrIdError> {
+        if let Some(win) = self.focused {
+            if let Some(win) = self.window_map.get(&win){
+                if self.tiling_win_stack.contains(&win){
+                    let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
+                    if index < self.tiling_win_stack.len() - 1 {
+                        self.tiling_win_stack.swap(index, index+1);
+                        self.create_new_layout(FibonacciLayout)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn create_new_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
         let screen = &self.conn.setup().roots[self.screen_num];
         let children = &self.tiling_win_stack;
