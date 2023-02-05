@@ -10,7 +10,7 @@ use x11rb::COPY_DEPTH_FROM_PARENT;
 
 use crate::config::*;
 use crate::keybind::KeyBind;
-use crate::layout::{FibonacciLayout, WindowLayout};
+use crate::layout::{TreeLayout, FibonacciLayout, WindowLayout};
 
 pub struct WM {
     conn: RustConnection,
@@ -43,13 +43,13 @@ impl WM {
 
         let key_map = KeyBind::get_keymap(&conn).unwrap();
         // TODO make config for custom shortcuts //TODO some way to set M2 vs M4
-        let fib_layout_hotkey = KeyBind::new("M2+f",&key_map);
-        let win_layout_hotkey = KeyBind::new("M2+f",&key_map);
-        let win_close_hotkey = KeyBind::new("M2+c",&key_map);
-        let win_move_up_hotkey = KeyBind::new("M2+u",&key_map);
-        let win_move_down_hotkey = KeyBind::new("M2+d",&key_map);
-        let win_move_left_hotkey = KeyBind::new("M2+l",&key_map);
-        let win_move_right_hotkey = KeyBind::new("M2+r",&key_map);
+        let fib_layout_hotkey = KeyBind::new("M4+f",&key_map);
+        let win_layout_hotkey = KeyBind::new("M4+f",&key_map);
+        let win_close_hotkey = KeyBind::new("M4+c",&key_map);
+        let win_move_up_hotkey = KeyBind::new("M4+u",&key_map);
+        let win_move_down_hotkey = KeyBind::new("M4+d",&key_map);
+        let win_move_left_hotkey = KeyBind::new("M4+l",&key_map);
+        let win_move_right_hotkey = KeyBind::new("M4+r",&key_map);
 
         let change = ChangeWindowAttributesAux::default()
             .event_mask(EventMask::POINTER_MOTION |
@@ -255,7 +255,7 @@ impl WM {
         let win_move_right_hotkey = self.win_move_right_hotkey.key;
         println!("handle key press was called {} up {}", key, win_move_up_hotkey);
         match key {
-            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout {})?,
+            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout)?,
             win if win == win_layout_hotkey => todo!(),
             close if close == win_close_hotkey => self.apply_layout(FibonacciLayout {})?,
             up if up == win_move_up_hotkey => {self.apply_layout(FibonacciLayout {})?; self.win_move_up()?;}, //TODO remove the apply layout call
@@ -306,7 +306,7 @@ impl WM {
         self.conn.grab_button(
             false,
             win,
-            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION | EventMask::KEY_PRESS,
+            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
             GrabMode::ASYNC,
             GrabMode::ASYNC,
             x11rb::NONE,
