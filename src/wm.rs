@@ -23,7 +23,10 @@ pub struct WM {
     gc: Gcontext,
     sequence_ignore: BinaryHeap<Reverse<u16>>,
     window_map: HashMap<Window, Window>,
-    window_map_reverse: HashMap<Window, Window>
+    window_map_reverse: HashMap<Window, Window>,
+
+    tiling_win_stack: Vec<Window>,
+    floating_win_stack: Vec<Window>,
 }
 
 impl WM {
@@ -58,7 +61,9 @@ impl WM {
             gc,
             sequence_ignore: BinaryHeap::new(),
             window_map: HashMap::new(),
-            window_map_reverse: HashMap::new()
+            window_map_reverse: HashMap::new(),
+            tiling_win_stack: Vec::new(),
+            floating_win_stack: Vec::new(),
         })
     }
 
@@ -80,6 +85,7 @@ impl WM {
         let frame_win = self.conn.generate_id()?;
         self.window_map.insert(win, frame_win);
         self.window_map_reverse.insert(frame_win, win);
+        self.floating_win_stack.push(frame_win);
 
         let win_aux = CreateWindowAux::new()
             .event_mask(EventMask::ENTER_WINDOW |
@@ -116,6 +122,10 @@ impl WM {
 
     fn unmanage(&mut self, win: Window) -> Result<(), ReplyError> {
         if let Some(parent) = self.window_map.remove(&win) {
+            let index = self.floating_win_stack.iter().position(|w| *w == win).unwrap();
+            self.floating_win_stack.remove(index);
+            let index = self.tiling_win_stack.iter().position(|w| *w == win).unwrap();
+            self.tiling_win_stack.remove(index);
             self.window_map_reverse.remove(&parent);
             let screen = &self.conn.setup().roots[self.screen_num];
             self.conn.reparent_window(win, screen.root, 0, 0)?;
@@ -137,22 +147,9 @@ impl WM {
 
     pub fn apply_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyOrIdError> {
         let screen = &self.conn.setup().roots[self.screen_num];
-        let children = self.conn.query_tree(screen.root)?.reply()?.children;
-        let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
-        let layout = layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children);
-        for (win, rect) in layout {
-            let config = &ConfigureWindowAux::new()
-                .width(rect.width as u32)
-                .height(rect.height as u32);
-            if let Some(parent) = self.window_map_reverse.get(&win) {
-                self.conn.configure_window(*parent, &config)?;
-            }
-            self.conn.configure_window(win, &config
-                .x(rect.x as i32)
-                .y(rect.y as i32))?;
-        }
-        self.draw_top_bar()?;
-        self.conn.flush()?;
+        self.tiling_win_stack.append(&mut self.floating_win_stack);
+        //let children = self.conn.query_tree(screen.root)?.reply()?.children;
+        self.create_new_layout(layout)?;
         Ok(())
     }
 
@@ -182,6 +179,43 @@ impl WM {
            (!self.move_flag && event.detail == RESIZE_BUTTON) {
             self.window = None;
         }
+    }
+
+    fn win_move_up(&mut self) -> Result<(), ReplyError> {
+        if let Some(win) = self.focused {
+            if let Some(win) = self.window_map.get(&win){
+                if self.tiling_win_stack.contains(&win){
+                    let index = self.tiling_win_stack.iter().position(|&w| w == *win).unwrap();
+                    if index > 0 {
+                        self.tiling_win_stack.swap(index, index-1);
+                        self.create_new_layout(FibonacciLayout {})?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn create_new_layout(&mut self, layout: impl WindowLayout) -> Result<(), ReplyError> {
+        let screen = &self.conn.setup().roots[self.screen_num];
+        let children = &self.tiling_win_stack;
+        let geom = self.conn.get_geometry(screen.root)?.reply().unwrap();
+        let layout = layout.layout(Rectangle { x: 0, y: 0, width: geom.width, height: geom.height }, children);
+        for (win, rect) in layout {
+            println!("{}", win);
+            let config = &ConfigureWindowAux::new()
+                .width(rect.width as u32)
+                .height(rect.height as u32);
+            if let Some(parent) = self.window_map_reverse.get(&win) {
+                self.conn.configure_window(*parent, &config)?;
+            }
+            self.conn.configure_window(win, &config
+                .x(rect.x as i32)
+                .y(rect.y as i32))?;
+        }
+        self.draw_top_bar()?;
+        self.conn.flush()?;
+        Ok(())
     }
 
     fn handle_key_press(&mut self, event: KeyPressEvent, key_handler: &impl KeyHandler) -> Result<(), ReplyOrIdError> {
