@@ -221,7 +221,7 @@ impl WM {
         let win_move_right_hotkey = self.win_move_right_hotkey.key;
         println!("handle key press was called");
         match key {
-            fib if fib == fib_layout_hotkey => self.apply_layout(TreeLayout)?,
+            fib if fib == fib_layout_hotkey => self.apply_layout(FibonacciLayout)?,
             win if win == win_layout_hotkey => todo!(),
             close if close == win_close_hotkey => self.apply_layout(FibonacciLayout)?,
             up if up == win_move_up_hotkey => self.apply_layout(FibonacciLayout)?,

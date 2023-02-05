@@ -17,7 +17,7 @@ impl WindowLayout for FibonacciLayout {
             } else {
                 width /= 2;
             }
-            result.push((windows[i], Rectangle { x, y, width, height }));
+            result.push((windows[windows.len() - i], Rectangle { x, y, width, height }));
 
             if i % 2 == 0 {
                 y += height as i16;
