@@ -59,3 +59,11 @@ The following shortcuts are available:
 - `M4 + SHIFT + RETURN` spawn program `xterm`
 
 (`M4` is usually the super-key in linux based systems; for some MAC based systems it is `M2` instead.)
+
+##License
+
+MSWM is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+Consult <https://www.gnu.org/licenses/> for further information.
